@@ -1,0 +1,135 @@
+name:                realworld
+version:             0.1.0.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/githubuser/realworld#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2018 Author name here
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Api
+                     , Prelude
+                     , Database
+                     , Password
+                     , Types
+                     , Rio
+  build-depends:       base-noprelude >= 4.7 && < 5
+                     , aeson
+                     , cryptonite
+                     , classy-prelude
+                     , conduit
+                     , rio
+                     , lens
+                     , monad-control
+                     , generic-lens
+                     , servant-server
+                     , wai
+                     , warp
+                     , beam-core
+                     , beam-postgres
+                     , postgresql-simple
+                     , jose
+                     , time
+                     , text
+                     , bytestring
+                     , transformers
+                     , containers
+                     , vector
+  default-language:    Haskell2010
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  default-extensions: OverloadedStrings
+                    , FlexibleInstances
+                    , FlexibleContexts
+                    , TypeSynonymInstances
+                    , TupleSections
+                    , DeriveGeneric
+                    , DeriveFunctor
+                    , DeriveFoldable
+                    , DeriveTraversable
+                    , ScopedTypeVariables
+                    , DeriveDataTypeable
+                    , RankNTypes
+                    , GADTs
+                    , ConstraintKinds
+                    , GeneralizedNewtypeDeriving
+                    , DeriveAnyClass
+                    , DerivingStrategies
+                    , TypeInType
+                    , PolyKinds
+                    , TypeFamilies
+                    , TypeFamilyDependencies
+                    , FunctionalDependencies
+                    , MultiParamTypeClasses
+                    , TypeOperators
+                    , DuplicateRecordFields
+                    , NamedFieldPuns
+                    , RecordWildCards
+                    , LambdaCase
+                    , TypeApplications
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/realworld
+
+executable realworld-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  build-depends:       base
+                     , realworld
+                     , classy-prelude
+  default-language:    Haskell2010
+  default-extensions: OverloadedStrings
+                    , FlexibleInstances
+                    , FlexibleContexts
+                    , TypeSynonymInstances
+                    , TupleSections
+                    , DeriveGeneric
+                    , DeriveFunctor
+                    , DeriveFoldable
+                    , DeriveTraversable
+                    , ScopedTypeVariables
+                    , DeriveDataTypeable
+                    , RankNTypes
+                    , GADTs
+                    , ConstraintKinds
+                    , GeneralizedNewtypeDeriving
+                    , TypeInType
+                    , PolyKinds
+                    , TypeFamilies
+                    , TypeFamilyDependencies
+                    , FunctionalDependencies
+                    , MultiParamTypeClasses
+                    , TypeOperators
+                    , DuplicateRecordFields
+                    , NamedFieldPuns
+                    , RecordWildCards
+                    , LambdaCase
+                    , TypeApplications
+                    , NoImplicitPrelude
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/realworld
+
+test-suite realworld-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , realworld
+                     , classy-prelude
+                     , hspec
+                     , hspec-wai
+                     , hspec-wai-json
+                     , aeson
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
