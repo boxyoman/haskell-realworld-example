@@ -34,6 +34,7 @@ module Database
   , getArticle
   , getArticles
   , updateArticle
+  , deleteArticle
   , getTags
 
   -- * Favorites
@@ -398,6 +399,22 @@ updateArticle userId slug T.UpdateArticle{..} =
              )
            )
            (\a -> #slug a ==. val_ slug)
+
+deleteArticle ::
+     HasDbConn env
+  => T.Slug
+  -> Rio env ()
+deleteArticle slug = do
+  runBeam $ do
+    runDelete $ delete (#articleTags conduitDb)
+      (\tag -> exists_ $ do
+        a <- qArticleBySlug (val_ slug)
+        guard_ $ #articleId tag ==. pk a
+        pure tag
+      )
+
+    runDelete $ delete (#article conduitDb)
+      (\a -> #slug a ==. val_ slug)
 
 qArticleTags :: PgQ s (PrimaryKey ArticleT (PgQExpr s), (PgQExpr s (Vector T.Tag)))
 qArticleTags =

@@ -182,6 +182,9 @@ type ArticleApi =
       :> Capture "slug" T.Slug
       :> ReqBody '[JSON] T.UpdateArticle
       :> Put '[JSON] ArticleResult
+  :<|> AuthProtect "required"
+      :> Capture "slug" T.Slug
+      :> Delete '[JSON] Text
   :<|> AuthProtect "optional"
       :> QueryParam "limit" Offset
       :> QueryParam "offset" Limit
@@ -199,6 +202,11 @@ getArticle mUser slug =
   ArticleResult <$>
     (Db.getArticle (#userId <$> mUser) slug >>= throwNotFound "Article not found")
 
+newArticle :: Db.HasDbConn env => Db.User -> T.NewArticle -> Rio env ArticleResult
+newArticle user@Db.User{userId} na = do
+  (a, _) <- Db.newArticle userId na
+  getArticle (Just user) (#slug a)
+
 updateArticle ::
      Db.HasDbConn env
   => Db.User
@@ -210,6 +218,17 @@ updateArticle user@Db.User{username, userId} slug uA = do
   when ((#username (#author article)) /= username) $ throw NotAuthorized
   Db.updateArticle userId slug uA
   getArticle (Just user) slug
+
+deleteArticle ::
+     Db.HasDbConn env
+  => Db.User
+  -> T.Slug
+  -> Rio env Text
+deleteArticle Db.User{username} slug = do
+  article <- (Db.getArticle Nothing slug >>= throwNotFound "Article not found")
+  when ((#username (#author article)) /= username) $ throw NotAuthorized
+  Db.deleteArticle slug
+  pure "OK"
 
 getArticles ::
      Db.HasDbConn env
@@ -250,16 +269,12 @@ getFeed Db.User{userId} offset limit =
    in toArticlesResult <$> Db.getArticles (Just userId) query
 
 
-newArticle :: Db.HasDbConn env => Db.User -> T.NewArticle -> Rio env ArticleResult
-newArticle user@Db.User{userId} na = do
-  (a, _) <- Db.newArticle userId na
-  getArticle (Just user) (#slug a)
-
 articleServer :: Db.HasDbConn env => ServerT ArticleApi (Rio env)
 articleServer =
   getArticle
   :<|> newArticle
   :<|> updateArticle
+  :<|> deleteArticle
   :<|> getArticles
   :<|> getFeed
 
