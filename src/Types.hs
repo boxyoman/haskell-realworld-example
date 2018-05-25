@@ -19,19 +19,28 @@ module Types
   -- * Article Stuff
   , ArticleId(..)
   , Slug(..)
+  , mkSlug
   , Title(..)
   , Description(..)
   , Body(..)
   , Tag(..)
   , NewArticle(..)
   , ArticleGet(..)
+  , UpdateArticle(..)
+  , ArticleQuery(..)
+
+  -- * Comment Stuff
+  , CommentId(..)
+  , NewComment(..)
+  , CommentBody(..)
+  , Comment(..)
   ) where
 
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Aeson (FromJSON, ToJSON(..))
 import Password
-
+import qualified Data.Text as T
 import Database.Beam.Backend.SQL.SQL92
 import Database.Beam.Postgres.Syntax (PgExpressionSyntax)
 import qualified Database.Beam.Postgres as Pg
@@ -43,7 +52,7 @@ import Data.Time (getCurrentTime, UTCTime)
 
 
 newtype UserId = UserId {unUserId :: Int64}
-  deriving (Generic)
+  deriving (Generic, Eq)
   deriving anyclass (Wrapped)
   deriving newtype (FromField, ToJSON)
 
@@ -54,9 +63,8 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be UserId where
   sqlValueSyntax = sqlValueSyntax . unUserId
 
 newtype Username = Username {unUsername :: Text}
-  deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving (Generic, Show, Eq)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Username
 instance HasSqlEqualityCheck PgExpressionSyntax Username
@@ -101,8 +109,7 @@ mkJWT userId = do
 
 newtype Email = Email {unEmail :: Text}
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Email
 instance HasSqlEqualityCheck PgExpressionSyntax Email
@@ -158,7 +165,7 @@ data Profile = Profile
   , image :: Text
   , following :: Bool
   }
-  deriving (Generic)
+  deriving (Generic, Show)
   deriving anyclass (ToJSON)
 
 
@@ -176,8 +183,7 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be ArticleId where
 
 newtype Slug = Slug { unSlug :: Text }
   deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Slug
 instance HasSqlEqualityCheck PgExpressionSyntax Slug
@@ -188,8 +194,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Slug where
 
 newtype Title = Title { unTitle :: Text }
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Title
 instance HasSqlEqualityCheck PgExpressionSyntax Title
@@ -197,11 +202,13 @@ instance HasSqlEqualityCheck PgExpressionSyntax Title
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Title where
   sqlValueSyntax = sqlValueSyntax . unTitle
 
+mkSlug :: Title -> UserId -> Slug
+mkSlug (Title str) userId =
+  Slug $ (T.intercalate "-" (words str)) <> "-" <> tshow (unUserId userId)
 
 newtype Description = Description { unDescription :: Text }
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Description
 instance HasSqlEqualityCheck PgExpressionSyntax Description
@@ -211,8 +218,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Description where
 
 newtype Body = Body { unBody :: Text }
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Body
 instance HasSqlEqualityCheck PgExpressionSyntax Body
@@ -223,16 +229,13 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Body where
 
 newtype Tag = Tag { unTag :: Text }
   deriving (Generic, Show, Ord, Eq)
-  deriving newtype (FromJSON, ToJSON)
-  deriving newtype (FromField)
+  deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Tag
 instance HasSqlEqualityCheck PgExpressionSyntax Tag
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Tag where
   sqlValueSyntax = sqlValueSyntax . unTag
-
-
 data NewArticle = NewArticle
   { title :: Title
   , description :: Description
@@ -259,3 +262,62 @@ data ArticleGet = ArticleGet
   deriving anyclass (ToJSON)
 
 
+
+data ArticleQuery = ArticleQuery
+  { limit :: Integer
+  , offset :: Integer
+  , mfavoritedBy :: Maybe Username
+  , mauthor :: Maybe Username
+  , mtag :: Maybe Tag
+  , isFollow :: Bool
+  }
+  deriving (Generic)
+
+
+data UpdateArticle = UpdateArticle
+  { title :: Maybe Title
+  , description :: Maybe Description
+  , body :: Maybe Body
+  }
+  deriving (Generic)
+  deriving anyclass (FromJSON)
+
+
+newtype CommentId = CommentId {unCommentId :: Int64}
+  deriving (Generic, Show)
+  deriving anyclass (Wrapped)
+  deriving newtype (FromField, ToJSON, FromJSON)
+
+instance FromBackendRow Pg.Postgres CommentId
+instance HasSqlEqualityCheck PgExpressionSyntax CommentId
+
+instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be CommentId where
+  sqlValueSyntax = sqlValueSyntax . unCommentId
+
+
+newtype CommentBody = CommentBody { unCommentBody :: Text }
+  deriving (Generic, Show, Eq)
+  deriving newtype (FromJSON, ToJSON, FromField)
+
+instance FromBackendRow Pg.Postgres CommentBody
+instance HasSqlEqualityCheck PgExpressionSyntax CommentBody
+
+instance HasSqlValueSyntax be Text => HasSqlValueSyntax be CommentBody where
+  sqlValueSyntax = sqlValueSyntax . unCommentBody
+
+
+data NewComment = NewComment
+  { body :: CommentBody
+  }
+  deriving (Generic, Show)
+  deriving anyclass (FromJSON)
+
+data Comment = Comment
+  { id :: CommentId
+  , body :: CommentBody
+  , createdAt :: UTCTime
+  , updatedAt :: UTCTime
+  , author :: Profile
+  }
+  deriving (Generic, Show)
+  deriving anyclass (ToJSON)
