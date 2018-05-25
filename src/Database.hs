@@ -1,9 +1,17 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# LANGUAGE OverloadedLabels #-}
 module Database
-  ( insertUser
+  ( ConduitDb(..)
+
+  -- * Db Stuff
+  , ConnectInfo
+  , ConnectionPool
+  , Connection
+  , createPool
+  , withPool
+  , connect
+  , HasDbPool
   , HasDbConn
-  , ConduitDb(..)
 
   -- * User Table
   , UserT(..)
@@ -13,6 +21,7 @@ module Database
   , getUserByEmail
   , getUserByUsername
   , updateUser
+  , insertUser
 
   -- * Profile
   , Profile
@@ -62,7 +71,8 @@ import Database.Beam
   )
 import Password (PasswordHash, getHash)
 import qualified Types as T
-import Database.Beam.Postgres (Connection)
+import Database.Beam.Postgres (Connection, connect, close)
+import Database.PostgreSQL.Simple ( ConnectInfo )
 import qualified Database.Beam.Postgres as Pg
 import qualified Database.Beam.Postgres.Full as Pg
 import qualified Database.Beam.Postgres.Syntax as Pg
@@ -73,8 +83,36 @@ import qualified Data.Conduit.List as Conduit
 import Data.Time (UTCTime)
 import qualified Data.Set as Set
 import qualified Data.Vector as V
+import qualified Data.Pool as Pool
+import Rio (contraMapRio)
 
 type HasDbConn env = HasField' "dbConn" env Connection
+type ConnectionPool = Pool.Pool Connection
+
+type HasDbPool env = HasField' "dbPool" env ConnectionPool
+
+
+createPool :: ConnectInfo -> IO ConnectionPool
+createPool connectionInfo =
+  Pool.createPool
+    (connect connectionInfo)
+    close
+    stripes
+    timeout
+    resourcesPerStripe
+  where
+    stripes = 2
+    timeout = 60
+    resourcesPerStripe = 8
+
+withPool :: (HasDbPool env, HasDbConn env) => (Rio env b) -> Rio env b
+withPool action = do
+  pool <- asks #dbPool
+  Pool.withResource
+    pool
+    (\conn ->
+      contraMapRio (setField @"dbConn" conn) action)
+
 
 -- Useful type aliases because working with the full ones sucks
 type PgQ = Q Pg.PgSelectSyntax ConduitDb

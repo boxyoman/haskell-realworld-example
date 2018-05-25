@@ -12,6 +12,8 @@ module Api
     , FavBy(..)
     , ArticlesResult(..)
     , CommentResult(..)
+    , NotFound(..)
+    , NotAuthorized(..)
     , server
     ) where
 
@@ -167,9 +169,13 @@ toArticlesResult a = ArticlesResult a (length a)
 
 
 newtype Offset = Offset { unOffset :: Integer}
+  deriving newtype (FromHttpApiData)
 newtype Limit = Limit { unLimit :: Integer}
+  deriving newtype (FromHttpApiData)
 newtype Author = Author { unAuthor :: T.Username}
+  deriving newtype (FromHttpApiData)
 newtype FavBy = FavBy { unFavBy :: T.Username}
+  deriving newtype (FromHttpApiData)
 
 type ArticleApi =
   AuthProtect "optional"

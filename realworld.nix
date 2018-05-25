@@ -1,8 +1,9 @@
 { mkDerivation, aeson, base, base-noprelude, beam-core
 , beam-postgres, bytestring, classy-prelude, conduit, containers
 , cryptonite, generic-lens, hspec, hspec-wai, hspec-wai-json, jose
-, lens, monad-control, postgresql-simple, rio, servant-server
-, stdenv, text, time, transformers, wai, warp
+, lens, monad-control, mtl, postgresql-simple, resource-pool, rio
+, servant-server, stdenv, text, time, transformers, vector, wai
+, warp
 }:
 mkDerivation {
   pname = "realworld";
@@ -13,10 +14,10 @@ mkDerivation {
   libraryHaskellDepends = [
     aeson base-noprelude beam-core beam-postgres bytestring
     classy-prelude conduit containers cryptonite generic-lens jose lens
-    monad-control postgresql-simple rio servant-server text time
-    transformers wai warp
+    monad-control mtl postgresql-simple resource-pool rio
+    servant-server text time transformers vector wai warp
   ];
-  executableHaskellDepends = [ base classy-prelude ];
+  executableHaskellDepends = [ base classy-prelude warp ];
   testHaskellDepends = [
     aeson base classy-prelude hspec hspec-wai hspec-wai-json
   ];

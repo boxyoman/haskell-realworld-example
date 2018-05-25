@@ -6,8 +6,6 @@ module Types
     -- * User Stuff
   , UserId(..)
   , Username
-  , Token
-  , mkJWT
   , Email
   , User
   , UserMaybes
@@ -15,6 +13,13 @@ module Types
   , UserGet(..)
   , NewUser(..)
   , Profile(..)
+
+  -- * JWT
+  , JWTError
+  , JWTDecodeError
+  , Token
+  , mkJWT
+  , decodeJWT
 
   -- * Article Stuff
   , ArticleId(..)
@@ -36,9 +41,11 @@ module Types
   , Comment(..)
   ) where
 
-import System.IO.Unsafe (unsafePerformIO)
+import Servant (FromHttpApiData)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Aeson (FromJSON, ToJSON(..))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
 import Password
 import qualified Data.Text as T
 import Database.Beam.Backend.SQL.SQL92
@@ -54,7 +61,7 @@ import Data.Time (getCurrentTime, UTCTime)
 newtype UserId = UserId {unUserId :: Int64}
   deriving (Generic, Eq)
   deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON)
+  deriving newtype (FromField, ToJSON, FromJSON)
 
 instance FromBackendRow Pg.Postgres UserId
 instance HasSqlEqualityCheck PgExpressionSyntax UserId
@@ -64,7 +71,7 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be UserId where
 
 newtype Username = Username {unUsername :: Text}
   deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Username
 instance HasSqlEqualityCheck PgExpressionSyntax Username
@@ -92,19 +99,40 @@ doJwtSign jwk claims = runExceptT $ do
   alg <- JWT.bestJWSAlg jwk
   JWT.signClaims jwk (JWT.newJWSHeader ((), alg)) claims
 
--- | Bad me
-instance Exception JWT.JWTError
+data JWTError = JWTError JWT.JWTError
+  deriving (Show)
+  deriving anyclass (Exception)
+
 
 gjwk :: JWT.JWK
-gjwk = unsafePerformIO $ JWT.genJWK (JWT.RSAGenParam (4096 `div` 8))
+gjwk = JWT.fromOctets ("myVerySecretKey" :: ByteString)
 
 mkJWT :: UserId -> IO Token
 mkJWT userId = do
   claims <- mkClaims userId
   eJWT <- doJwtSign gjwk claims
   case eJWT of
-    Left e -> throw e
-    Right bytes -> pure $ Token $ toStrict $ decodeUtf8 $ JWT.encodeCompact bytes
+    Left e -> throw (JWTError e)
+    Right bytes ->
+      pure $ Token $ toStrict $ decodeUtf8 $ JWT.encodeCompact bytes
+
+
+data JWTDecodeError = UserIdNotFound | JWTError' JWT.JWTError
+  deriving (Show)
+
+
+decodeJWT :: ByteString -> IO (Either JWTDecodeError UserId)
+decodeJWT bs = do
+  let config = JWT.defaultJWTValidationSettings ( (== "conduitClient"))
+  eClaims <- runExceptT $ do
+    jwt <- JWT.decodeCompact (fromStrict bs)
+    JWT.verifyClaims config gjwk jwt
+  case eClaims of
+    Left e -> pure $ Left (JWTError' e)
+    Right claims ->
+      case view (JWT.unregisteredClaims . at "userId") claims >>= Aeson.parseMaybe Aeson.parseJSON of
+        Just v -> pure $ Right v
+        Nothing -> pure $ Left UserIdNotFound
 
 
 newtype Email = Email {unEmail :: Text}
@@ -183,7 +211,7 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be ArticleId where
 
 newtype Slug = Slug { unSlug :: Text }
   deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Slug
 instance HasSqlEqualityCheck PgExpressionSyntax Slug
@@ -229,7 +257,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Body where
 
 newtype Tag = Tag { unTag :: Text }
   deriving (Generic, Show, Ord, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Tag
 instance HasSqlEqualityCheck PgExpressionSyntax Tag
@@ -286,7 +314,7 @@ data UpdateArticle = UpdateArticle
 newtype CommentId = CommentId {unCommentId :: Int64}
   deriving (Generic, Show)
   deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON, FromJSON)
+  deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres CommentId
 instance HasSqlEqualityCheck PgExpressionSyntax CommentId
