@@ -149,7 +149,8 @@ type ArticleApi =
 
 getArticle :: Db.HasDbConn env => Maybe Db.User -> T.Slug -> Rio env ArticleResult
 getArticle mUser slug = do
-  (a, tags, profile) <- Db.getArticle (#userId <$> mUser) slug >>= throwNotFound "Article not found"
+  (a, tags, profile, isFav, favCount) <-
+    Db.getArticle (#userId <$> mUser) slug >>= throwNotFound "Article not found"
   pure $ ArticleResult $ T.ArticleGet
     (#slug a)
     (#title a)
@@ -158,8 +159,8 @@ getArticle mUser slug = do
     tags
     (#createdAt a)
     (#updatedAt a)
-    False
-    0
+    isFav
+    favCount
     profile
 
 newArticle :: Db.HasDbConn env => Db.User -> T.NewArticle -> Rio env ArticleResult
@@ -172,10 +173,38 @@ articleServer =
   getArticle
   :<|> newArticle
 
+type FavoriteApi =
+  AuthProtect "required"
+      :> Capture "slug" T.Slug
+      :> "favorite"
+      :> Post '[JSON] ArticleResult
+  :<|> AuthProtect "required"
+      :> Capture "slug" T.Slug
+      :> "favorite"
+      :> Delete '[JSON] ArticleResult
+
+favorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env ArticleResult
+favorite user@Db.User{userId} slug = do
+  Db.favorite userId slug
+  getArticle (Just user) slug
+
+unfavorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env ArticleResult
+unfavorite user@Db.User{userId} slug = do
+  Db.unfavorite userId slug
+  getArticle (Just user) slug
+
+
+favoriteServer :: Db.HasDbConn env => ServerT FavoriteApi (Rio env)
+favoriteServer =
+  favorite
+  :<|> unfavorite
+
 type Api = "api" :>
   ( "users" :> UsersApi
     :<|> "profile" :> ProfileApi
     :<|> "articles" :> ArticleApi
+    :<|> "articles" :> FavoriteApi
+    :<|> "tags" :> Get '[JSON] (Set T.Tag)
   )
 
 server :: Db.HasDbConn env => ServerT Api (Rio env)
@@ -183,3 +212,5 @@ server =
   userServer
   :<|> profileServer
   :<|> articleServer
+  :<|> favoriteServer
+  :<|> Db.getTags

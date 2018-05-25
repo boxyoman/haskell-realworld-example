@@ -31,6 +31,13 @@ module Database
   , ArticleTag
   , newArticle
   , getArticle
+  , getTags
+
+  -- * Favorites
+  , FavoriteT(..)
+  , Favorite
+  , favorite
+  , unfavorite
   ) where
 
 import Database.Beam
@@ -38,13 +45,15 @@ import Database.Beam
   , defaultDbSettings, default_, val_, insertExpressions
   , FromBackendRow, lookup_, runSelectReturningOne, select, all_, guard_, (==.)
   , update, runUpdate, (<-.), related_, runInsert, insert, insertFrom, exists_
-  , runDelete, delete, pk, group_, aggregate_
+  , runDelete, delete, pk, group_, aggregate_, Q, QExpr, count_, nub_
+  , runSelectReturningList
   )
 import Password (PasswordHash, getHash)
 import qualified Types as T
 import Database.Beam.Postgres (Connection)
 import qualified Database.Beam.Postgres as Pg
 import qualified Database.Beam.Postgres.Full as Pg
+import qualified Database.Beam.Postgres.Syntax as Pg
 import qualified Database.Beam.Postgres.Conduit as PgC
 import Data.Conduit ((.|), ConduitM)
 import qualified Data.Conduit as Conduit
@@ -74,6 +83,9 @@ instance Table UserT where
     deriving Generic
     deriving anyclass (Beamable)
   primaryKey = UserId . #userId
+
+unUserId :: PrimaryKey UserT f -> Columnar f T.UserId
+unUserId (UserId a) = a
 
 data FollowingT f = Following
   { userId    :: PrimaryKey UserT f
@@ -132,11 +144,30 @@ instance Table ArticleTagT where
   primaryKey = ArticleTagKey <$> #articleId <*> #tag
 
 
+data FavoriteT f = Favorite
+  { articleId :: PrimaryKey ArticleT f
+  , userId    :: PrimaryKey UserT f
+  }
+  deriving Generic
+  deriving anyclass (Beamable)
+
+
+type Favorite = FavoriteT Identity
+
+instance Table FavoriteT where
+  data PrimaryKey FavoriteT f =
+    FavoriteKey (PrimaryKey ArticleT f) (PrimaryKey UserT f)
+    deriving Generic
+    deriving anyclass (Beamable)
+  primaryKey = FavoriteKey <$> #articleId <*> #userId
+
+
 data ConduitDb f = ConduitDb
   { user :: f (TableEntity UserT)
   , following :: f (TableEntity FollowingT)
   , article :: f (TableEntity ArticleT)
   , articleTags :: f (TableEntity ArticleTagT)
+  , favorites :: f (TableEntity FavoriteT)
   } deriving (Generic)
 
 instance Database be ConduitDb
@@ -215,6 +246,7 @@ updateUser userId T.User{..} =
       maybeToList . fmap (\ val -> row c <-. val_ val)
 
 
+qIsFollowing :: PgQExpr s (T.UserId) -> PgQExpr s T.UserId -> PgQExpr s Bool
 qIsFollowing userId fUserId = exists_ $ do
   following <- all_ (#following conduitDb)
   guard_ $ (#userId following) ==. (UserId userId)
@@ -224,13 +256,15 @@ qIsFollowing userId fUserId = exists_ $ do
 -- | (Username, Bio, Image, isFollowing)
 type Profile = (T.Username, Text, Text, Bool)
 
-profileGroup (u, b, i, f) = (group_ u, group_ b, group_ i, group_ f)
+type QExprProfile s =
+  (PgQExpr s T.Username, PgQExpr s Text, PgQExpr s Text, PgQExpr s Bool)
 
 toProfile :: Profile -> T.Profile
 toProfile (u, bio, i, isf) = T.Profile u bio i isf
 
 -- | Gets the profile of userId, use mUserId the know if the the current user
 -- is following.
+qGetProfile :: Maybe T.UserId -> UserT (PgQExpr s) -> PgQ s (QExprProfile s)
 qGetProfile mUserId user = do
   let isF = case mUserId of
               Just a -> qIsFollowing (val_ a) (#userId user)
@@ -313,33 +347,106 @@ newArticle userId T.NewArticle{..} = do
     runInsertReturning (insertTags' articleId) (\c -> Conduit.runConduit $ c .| Conduit.consume)
   pure (article, tags)
 
--- qTagList articleId = do
---   pure $ (group_ articleId, Pg.pgArrayAgg tag)
+type PgQ = Q Pg.PgSelectSyntax ConduitDb
+type PgQExpr = QExpr Pg.PgExpressionSyntax
 
--- return (Article, Vector Tag, Profile)
--- Will probably have to add a few things to this...
-qArticle mUserId =
-  aggregate_ (\(a, t, p) -> (group_ a, Pg.pgArrayAgg t, profileGroup p)) $ do
-    article <- all_ (#article conduitDb)
+
+qArticleTags :: PgQ s (PrimaryKey ArticleT (PgQExpr s), (PgQExpr s (Vector T.Tag)))
+qArticleTags =
+  aggregate_ (\(articleId, tag) -> (group_ articleId, Pg.pgArrayAgg tag)) $ do
     tag <- all_ (#articleTags conduitDb)
-    guard_ $ #articleId tag ==. pk article
+    pure (#articleId tag, #tag tag)
+
+
+qArticle ::
+  Maybe T.UserId
+  -> PgQ s
+      ( ArticleT (PgQExpr s)
+      , PgQExpr s (Vector T.Tag)
+      , QExprProfile s
+      , PgQExpr s Bool
+      , PgQExpr s Int64
+      )
+qArticle mUserId = do
+    article <- all_ (#article conduitDb)
+    (articleId, tag) <- qArticleTags
+    guard_ $ articleId ==. pk article
     user <- related_ (#user conduitDb) (#userId article)
     profile <- qGetProfile mUserId user
-    pure (article, #tag tag, profile)
+    (favAId, favCount) <- qFavoriteCount
+    guard_ $ favAId ==. pk article
+    let isFav = case mUserId of
+                  Just userId -> qIsFavorited userId (#articleId article)
+                  Nothing -> val_ False
+    pure (article, tag, profile, isFav, favCount)
+
+
+qIsFavorited :: T.UserId -> PgQExpr s T.ArticleId -> PgQExpr s Bool
+qIsFavorited userId articleId = exists_ $ do
+  fav <- all_ (#favorites conduitDb)
+  guard_ $ (#userId fav) ==. (UserId (val_ userId))
+  guard_ $ (#articleId fav) ==. (ArticleId articleId)
+  pure fav
+
+
+qFavoriteCount ::  PgQ s (PrimaryKey ArticleT (PgQExpr s), (PgQExpr s (Int64)))
+qFavoriteCount =
+  aggregate_ (\(a, u) -> (group_ a, count_ u)) $ do
+    fav <- all_ (#favorites conduitDb)
+    pure (#articleId fav, unUserId $ #userId fav)
 
 
 getArticle ::
      HasDbConn env
   => Maybe T.UserId
   -> T.Slug
-  -> Rio env (Maybe (Article, Set T.Tag, T.Profile))
+  -> Rio env (Maybe (Article, Set T.Tag, T.Profile, Bool, Int64))
 getArticle mUserId slug = do
   mA <- runBeam $ runSelectReturningOne $ select $ do
-    (a, t, p) <- qArticle mUserId
+    (a, t, p, isFav, favCount) <- qArticle mUserId
     guard_ $ #slug a ==. val_ slug
-    pure (a, t, p)
+    pure (a, t, p, isFav, favCount)
   case mA of
-    Just (a, tags, p) ->
-      pure $ Just $ (a, Set.fromList (V.toList tags), toProfile p)
+    Just (a, tags, p, isFav, favCount) ->
+      pure $ Just $ (a, Set.fromList (V.toList tags), toProfile p, isFav, favCount)
     Nothing -> pure Nothing
 
+
+getTags ::
+     HasDbConn env
+  => Rio env (Set T.Tag)
+getTags = do
+  tags <- runBeam $ runSelectReturningList $ select $ nub_ $ do
+    #tag <$> all_ (#articleTags conduitDb)
+  pure $ Set.fromList tags
+
+
+qArticleBySlug :: PgQExpr s T.Slug -> PgQ s (ArticleT (PgQExpr s))
+qArticleBySlug slug = do
+  article <- all_ (#article conduitDb)
+  guard_ $ #slug article ==. slug
+  pure article
+
+favorite ::
+     HasDbConn env
+  => T.UserId
+  -> T.Slug
+  -> Rio env ()
+favorite userId slug =
+  runBeam $ runInsert $ insert (#favorites conduitDb) $ insertFrom $ do
+    article <- qArticleBySlug (val_ slug)
+    pure $ Favorite (ArticleId (#articleId article)) (val_ (UserId userId))
+
+unfavorite ::
+     HasDbConn env
+  => T.UserId
+  -> T.Slug
+  -> Rio env ()
+unfavorite userId slug = do
+  runBeam $ runDelete $ delete (#favorites conduitDb)
+    (\f -> exists_ $ do
+      article <- qArticleBySlug (val_ slug)
+      guard_ $ ArticleId (#articleId article) ==. (#articleId f)
+      guard_ $ (#userId f) ==. val_ (UserId userId)
+      pure article
+    )
