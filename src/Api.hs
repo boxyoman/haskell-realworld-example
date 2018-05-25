@@ -250,7 +250,6 @@ getArticles mUser offset limit author favBy tag =
           False
    in toArticlesResult <$> (Db.getArticles (#userId <$> mUser) query)
 
-
 getFeed ::
      Db.HasDbConn env
   => Db.User
@@ -371,7 +370,7 @@ commentServer =
 
 type Api = "api" :>
   ( "users" :> UsersApi
-    :<|> "profile" :> ProfileApi
+    :<|> "profiles" :> ProfileApi
     :<|> "articles" :> ArticleApi
     :<|> "articles" :> FavoriteApi
     :<|> "articles" :> CommentApi
