@@ -210,7 +210,7 @@ type ArticlesApi =
       :> QueryParam "limit" Limit
       :> QueryParam "offset" Offset
       :> QueryParam "author" Author
-      :> QueryParam "favourited" FavBy
+      :> QueryParam "favorited" FavBy
       :> QueryParam "tag" T.Tag
       :> Get '[JSON] ArticlesResult
 
