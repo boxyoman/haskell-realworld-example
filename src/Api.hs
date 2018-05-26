@@ -93,7 +93,7 @@ type UserApi =
   AuthProtect "required"
       :> Get '[JSON] (UserBody T.UserGet)
   :<|> AuthProtect "required"
-      :> ReqBody '[JSON] (UserBody T.UserMaybes)
+      :> ReqBody '[JSON] (UserBody T.UpdateUser)
       :> Put '[JSON] (UserBody T.UserGet)
 
 getUser :: Db.User -> Rio env (UserBody T.UserGet)
@@ -101,7 +101,11 @@ getUser user =
   UserBody <$> dbUserToUser user
 
 
-updateUser :: Db.HasDbConn env => Db.User -> (UserBody T.UserMaybes) -> Rio env (UserBody T.UserGet)
+updateUser ::
+     Db.HasDbConn env
+  => Db.User
+  -> UserBody T.UpdateUser
+  -> Rio env (UserBody T.UserGet)
 updateUser Db.User{userId} (UserBody uUser) = do
   Db.updateUser userId uUser
   Just dbUser <- Db.getUser userId

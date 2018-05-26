@@ -378,8 +378,9 @@ maybeUpdate c row =
   maybeToList . fmap (\ val -> row c <-. val_ val)
 
 -- | Anything set to Nothing in T.UserMaybes won't be updated
-updateUser :: HasDbConn env => T.UserId -> T.UserMaybes -> Rio env ()
-updateUser userId T.User{..} = do
+updateUser :: HasDbConn env => T.UserId -> T.UpdateUser -> Rio env ()
+updateUser userId T.UpdateUser{..} = do
+  phash <- liftIO $ traverse getHash password
   now <- liftIO getCurrentTime
   runBeam $ runUpdate $
     update (#_user conduitDb)
@@ -388,6 +389,7 @@ updateUser userId T.User{..} = do
              <> maybeUpdate u (#email) email
              <> maybeUpdate u (#bio) bio
              <> maybeUpdate u (#image) image
+             <> maybeUpdate u (#password) phash
              <> [ #updatedAt u <-. val_ now]
              )
            )

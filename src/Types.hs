@@ -7,9 +7,7 @@ module Types
   , UserId(..)
   , Username
   , Email
-  , User
-  , UserMaybes
-  , User'(..)
+  , UpdateUser(..)
   , UserGet(..)
   , NewUser(..)
   , Profile(..)
@@ -151,20 +149,15 @@ type family HKD (f :: Type -> Type) a where
   HKD f a = f a
 
 
-data User' f = User
-  { email    :: HKD f Email
-  , username :: HKD f Username
-  , bio      :: HKD f Text
-  , image    :: HKD f Text
+data UpdateUser = UpdateUser
+  { email    :: Maybe Email
+  , username :: Maybe Username
+  , bio      :: Maybe Text
+  , image    :: Maybe Text
+  , password :: Maybe NewPassword
   }
   deriving (Generic)
-
-type User = User' Identity
-type UserMaybes = User' Maybe
-
-instance FromJSON (User' Maybe)
-instance FromJSON (User' Identity)
-instance ToJSON (User' Identity)
+  deriving (FromJSON)
 
 
 data UserGet = UserGet
