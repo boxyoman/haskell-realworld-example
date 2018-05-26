@@ -38,14 +38,14 @@ CREATE TABLE IF NOT EXISTS article_tag
   ( article_id bigint NOT NULL
   , tag Text NOT NULL
   , PRIMARY KEY (article_id, tag)
-  , FOREIGN KEY (article_id) REFERENCES article (article_id)
+  , FOREIGN KEY (article_id) REFERENCES article (article_id) ON DELETE CASCADE
   );
 
 CREATE TABLE IF NOT EXISTS favorites
   ( article_id bigint NOT NULL
   , user_id bigint NOT NULL
   , PRIMARY KEY (article_id, user_id)
-  , FOREIGN KEY (article_id) REFERENCES article (article_id)
+  , FOREIGN KEY (article_id) REFERENCES article (article_id) ON DELETE CASCADE
   , FOREIGN KEY (user_id) REFERENCES "user" (user_id)
   );
 
@@ -57,6 +57,6 @@ CREATE TABLE IF NOT EXISTS comments
   , created_at timestamptz NOT NULL DEFAULT NOW()
   , updated_at timestamptz NOT NULL DEFAULT NOW()
   , PRIMARY KEY (comment_id)
-  , FOREIGN KEY (article_id) REFERENCES article (article_id)
+  , FOREIGN KEY (article_id) REFERENCES article (article_id) ON DELETE CASCADE
   , FOREIGN KEY (user_id) REFERENCES "user" (user_id)
   );

@@ -67,7 +67,7 @@ import Database.Beam
   , defaultDbSettings, default_, val_, insertExpressions
   , FromBackendRow, lookup_, runSelectReturningOne, select, all_, guard_, (==.)
   , update, runUpdate, (<-.), related_, runInsert, insert, insertFrom, exists_
-  , runDelete, delete, pk, group_, aggregate_, Q, QExpr, count_, nub_
+  , runDelete, delete, group_, aggregate_, Q, QExpr, count_, nub_
   , runSelectReturningList, orderBy_, desc_, offset_, limit_
   , withDbModification, dbModification, tableModification, modifyTable
   , fieldNamed, FieldModification, TableField, leftJoin_, references_, (&&.)
@@ -520,13 +520,6 @@ deleteArticle ::
   -> Rio env ()
 deleteArticle slug = do
   runBeam $ do
-    runDelete $ delete (#_article_tag conduitDb)
-      (\tag -> exists_ $ do
-        a <- qArticleBySlug (val_ slug)
-        guard_ $ #articleId tag ==. pk a
-        pure tag
-      )
-
     runDelete $ delete (#_article conduitDb)
       (\a -> #slug a ==. val_ slug)
 
