@@ -2,12 +2,12 @@ name:                realworld
 version:             0.1.0.0
 -- synopsis:
 -- description:
-homepage:            https://github.com/githubuser/realworld#readme
+homepage:            https://github.com/boxyoman/haskell-realworld-example/
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2018 Author name here
+author:              Jonathan Covert
+maintainer:          jonny.covert@gmail.com
+copyright:           2018 Jonathan Covert
 category:            Web
 build-type:          Simple
 extra-source-files:  README.md
