@@ -230,9 +230,9 @@ instance HasSqlEqualityCheck PgExpressionSyntax Title
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Title where
   sqlValueSyntax = sqlValueSyntax . unTitle
 
-mkSlug :: Title -> UserId -> Slug
-mkSlug (Title str) userId =
-  Slug $ (T.intercalate "-" (words str)) <> "-" <> tshow (unUserId userId)
+mkSlug :: Title ->  Slug
+mkSlug (Title str) =
+  Slug $ (T.intercalate "-" (words str))
 
 newtype Description = Description { unDescription :: Text }
   deriving (Generic, Show)

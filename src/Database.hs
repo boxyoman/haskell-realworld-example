@@ -67,7 +67,7 @@ import Database.Beam
   , FromBackendRow, lookup_, runSelectReturningOne, select, all_, guard_, (==.)
   , update, runUpdate, (<-.), related_, runInsert, insert, insertFrom, exists_
   , runDelete, delete, pk, group_, aggregate_, Q, QExpr, count_, nub_
-  , runSelectReturningList, subquery_, orderBy_, desc_, offset_, limit_
+  , runSelectReturningList, orderBy_, desc_, offset_, limit_
   , withDbModification, dbModification, tableModification, modifyTable
   , fieldNamed, FieldModification, TableField, leftJoin_, references_
   )
@@ -451,7 +451,7 @@ newArticle userId T.NewArticle{..} = do
           [ Article
               default_
               (val_ (UserId userId))
-              (val_ (T.mkSlug title userId))  -- TODO: Figure out how to generate slug
+              (val_ (T.mkSlug title))
               (val_ title)
               (val_ description)
               (val_ body)
@@ -482,8 +482,8 @@ newArticle userId T.NewArticle{..} = do
 
 -- | Anything set to Nothing in T.UpdateArticle won't be updated
 updateArticle ::
-  HasDbConn env => T.UserId -> T.Slug -> T.UpdateArticle -> Rio env ()
-updateArticle userId slug T.UpdateArticle{..} = do
+  HasDbConn env => T.Slug -> T.UpdateArticle -> Rio env ()
+updateArticle slug T.UpdateArticle{..} = do
   now <- liftIO $ getCurrentTime
   runBeam $ runUpdate $
     update (#_article conduitDb)
@@ -491,7 +491,7 @@ updateArticle userId slug T.UpdateArticle{..} = do
              (  maybeUpdate a (#title) title
              <> maybeUpdate a (#description) description
              <> maybeUpdate a (#body) body
-             <> maybeUpdate a (#slug) ((flip T.mkSlug) userId <$> title)
+             <> maybeUpdate a (#slug) (T.mkSlug <$> title)
              <> [ #updatedAt a <-. val_ now]
              )
            )
@@ -559,12 +559,6 @@ qArticle mUserId = do
                   Nothing -> val_ False
     pure (article, tag, profile, isFav, favCount)
 
-
-
-qTagToArray :: T.Tag -> PgQExpr s (Vector (Maybe T.Tag))
-qTagToArray tag = subquery_ $ aggregate_ Pg.pgArrayAgg $ pure (val_ (Just tag))
-
-
 qArticleQuery ::
   Maybe T.UserId
   -> T.ArticleQuery
@@ -577,12 +571,16 @@ qArticleQuery ::
       )
 qArticleQuery mUserId T.ArticleQuery{..} =
   limit_ limit $ offset_ offset $ orderBy_ (desc_ . #createdAt . view _1 ) $ do
-    a@(article, tags, profile, _, _) <- qArticle mUserId
+    article <- all_ (#_article conduitDb)
     case mtag of
-      Just tag -> guard_ $ tags `Pg.isSupersetOf_` (qTagToArray tag)
+      Just tag -> do
+        tagd <- all_ (#_article_tag conduitDb)
+        guard_ $ #tag tagd ==. val_ tag
       Nothing -> pure ()
     case mauthor of
-      Just author -> guard_ $ view _1 profile ==. val_ author
+      Just author -> do
+        user <- related_ (#_user conduitDb) (#userId article)
+        guard_ $ #username user ==. val_ author
       Nothing -> pure ()
     case (mUserId, isFollow) of
       (Just userId, True) ->
@@ -594,6 +592,8 @@ qArticleQuery mUserId T.ArticleQuery{..} =
         user <- qUserByUsername (val_ favBy)
         guard_ $ qIsFavorited (#userId user) (#articleId article)
       Nothing -> pure ()
+    a@(art, _, _, _, _) <- qArticle mUserId
+    guard_ $ #articleId art ==. #articleId article
     pure a
 
 toArticle :: (Article, Vector (Maybe T.Tag), Profile, Bool, Int64) -> T.ArticleGet

@@ -225,10 +225,10 @@ updateArticle ::
   -> T.Slug
   -> ArticleApi T.UpdateArticle
   -> Rio env (ArticleApi T.ArticleGet)
-updateArticle user@Db.User{username, userId} slug (ArticleApi uA) = do
+updateArticle user@Db.User{username} slug (ArticleApi uA) = do
   article <- (Db.getArticle Nothing slug >>= throwNotFound "Article not found")
   when ((#username (#author article)) /= username) $ throw NotAuthorized
-  Db.updateArticle userId slug uA
+  Db.updateArticle slug uA
   getArticle (Just user) slug
 
 deleteArticle ::
