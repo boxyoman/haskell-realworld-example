@@ -27,6 +27,11 @@ to setup NixOps, otherwise
 
     nix-env -i nixops
 
+You'll also need [VirtualBox](https://www.virtualbox.org). You'll need to do
+once wierd setup of VirtualBox
+
+    VBoxManage hostonlyif create
+
 Clone the repository and move into it
 
     git clone https://github.com/boxyoman/haskell-realworld-example.git
