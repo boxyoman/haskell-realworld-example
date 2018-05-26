@@ -70,7 +70,7 @@ import Database.Beam
   , runDelete, delete, pk, group_, aggregate_, Q, QExpr, count_, nub_
   , runSelectReturningList, orderBy_, desc_, offset_, limit_
   , withDbModification, dbModification, tableModification, modifyTable
-  , fieldNamed, FieldModification, TableField, leftJoin_, references_
+  , fieldNamed, FieldModification, TableField, leftJoin_, references_, (&&.)
   )
 import Password (PasswordHash, getHash)
 import qualified Types as T
@@ -689,15 +689,12 @@ favorite userId slug =
 unfavorite ::
      HasDbConn env
   => T.UserId
-  -> T.Slug
+  -> T.ArticleId
   -> Rio env ()
-unfavorite userId slug = do
+unfavorite userId articleId = do
   runBeam $ runDelete $ delete (#_favorites conduitDb)
-    (\f -> exists_ $ do
-      article <- qArticleBySlug (val_ slug)
-      guard_ $ ArticleId (#articleId article) ==. (#articleId f)
-      guard_ $ (#userId f) ==. val_ (UserId userId)
-      pure article
+    (\f -> (#userId f) ==. val_ (UserId userId)
+          &&. (#articleId f) ==. val_ (ArticleId articleId)
     )
 
 

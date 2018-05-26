@@ -311,7 +311,8 @@ favorite user@Db.User{userId} slug = do
 
 unfavorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env (ArticleApi T.ArticleGet)
 unfavorite user@Db.User{userId} slug = do
-  Db.unfavorite userId slug
+  article <- Db.articleBySlug slug >>= throwNotFound "article not found"
+  Db.unfavorite userId (#articleId article)
   getArticle (Just user) slug
 
 
