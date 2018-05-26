@@ -3,14 +3,15 @@
 
 module Api
     ( Api
-    , UserResult(..)
+    , UserApi(..)
     , ProfileResult(..)
-    , ArticleResult(..)
+    , ArticleApi(..)
     , Offset(..)
     , Limit(..)
     , Author(..)
     , FavBy(..)
     , ArticlesResult(..)
+    , CommentPost(..)
     , CommentResult(..)
     , NotFound(..)
     , NotAuthorized(..)
@@ -39,12 +40,13 @@ throwNotFound str Nothing = throw (NotFound str)
 type instance AuthServerData (AuthProtect "required") = Db.User
 type instance AuthServerData (AuthProtect "optional") = Maybe Db.User
 
-
-data UserResult = UserResult
-  { user :: T.UserGet
+data UserApi a = UserApi
+  { user :: a
   }
   deriving (Generic)
   deriving anyclass (FromJSON, ToJSON)
+
+
 
 
 data LoginData = LoginData
@@ -56,16 +58,16 @@ data LoginData = LoginData
 
 
 type UsersApi =
-  "loging"
-      :> ReqBody '[JSON] LoginData
-      :> Post '[JSON] UserResult
-  :<|> ReqBody '[JSON] T.NewUser
-      :> Post '[JSON] UserResult
+  "login"
+      :> ReqBody '[JSON] (UserApi LoginData)
+      :> Post '[JSON] (UserApi T.UserGet)
+  :<|> ReqBody '[JSON] (UserApi T.NewUser)
+      :> Post '[JSON] (UserApi T.UserGet)
   :<|> AuthProtect "required"
-      :> Get '[JSON] UserResult
+      :> Get '[JSON] (UserApi T.UserGet)
   :<|> AuthProtect "required"
-      :> ReqBody '[JSON] T.UserMaybes
-      :> Put '[JSON] UserResult
+      :> ReqBody '[JSON] (UserApi T.UserMaybes)
+      :> Put '[JSON] (UserApi T.UserGet)
 
 
 
@@ -74,30 +76,30 @@ dbUserToUser Db.User{..} = do
   token <- liftIO $ T.mkJWT userId
   pure $ T.UserGet email username token bio image
 
-newuser :: Db.HasDbConn env => T.NewUser -> Rio env UserResult
-newuser newUser = do
+newuser :: Db.HasDbConn env => UserApi T.NewUser -> Rio env (UserApi T.UserGet)
+newuser (UserApi newUser) = do
   dbUser <- Db.insertUser newUser
-  UserResult <$> dbUserToUser dbUser
+  UserApi <$> dbUserToUser dbUser
 
-getUser :: Db.User -> Rio env UserResult
+getUser :: Db.User -> Rio env (UserApi T.UserGet)
 getUser user =
-  UserResult <$> dbUserToUser user
+  UserApi <$> dbUserToUser user
 
-loginUser :: Db.HasDbConn env => LoginData -> Rio env UserResult
-loginUser LoginData{..} = do
+loginUser :: Db.HasDbConn env => UserApi LoginData -> Rio env (UserApi T.UserGet)
+loginUser (UserApi LoginData{..}) = do
   mUser <- Db.getUserByEmail email
   case mUser of
     Just user@Db.User{password = passwordHash} ->
       if comparePassword password passwordHash
-         then UserResult <$> dbUserToUser user
+         then UserApi <$> dbUserToUser user
          else throw NotAuthorized
     Nothing -> throw NotAuthorized
 
-updateUser :: Db.HasDbConn env => Db.User -> T.UserMaybes -> Rio env UserResult
-updateUser Db.User{userId} uUser = do
+updateUser :: Db.HasDbConn env => Db.User -> (UserApi T.UserMaybes) -> Rio env (UserApi T.UserGet)
+updateUser Db.User{userId} (UserApi uUser) = do
   Db.updateUser userId uUser
   Just dbUser <- Db.getUser userId
-  UserResult <$> dbUserToUser dbUser
+  UserApi <$> dbUserToUser dbUser
 
 userServer :: Db.HasDbConn env => ServerT UsersApi (Rio env)
 userServer =
@@ -150,11 +152,11 @@ profileServer =
   :<|> unfollow
 
 
-data ArticleResult = ArticleResult
-  { article :: T.ArticleGet
+data ArticleApi a = ArticleApi
+  { article :: a
   }
   deriving (Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, FromJSON)
 
 
 data ArticlesResult = ArticlesResult
@@ -177,17 +179,22 @@ newtype Author = Author { unAuthor :: T.Username}
 newtype FavBy = FavBy { unFavBy :: T.Username}
   deriving newtype (FromHttpApiData)
 
-type ArticleApi =
-  AuthProtect "optional"
+type ArticlesApi =
+  "feed"
+      :>AuthProtect "required"
+      :> QueryParam "limit" Offset
+      :> QueryParam "offset" Limit
+      :> Get '[JSON] ArticlesResult
+  :<|> AuthProtect "optional"
       :> Capture "slug" T.Slug
-      :> Get '[JSON] ArticleResult
+      :> Get '[JSON] (ArticleApi T.ArticleGet)
   :<|> AuthProtect "required"
-      :> ReqBody '[JSON] T.NewArticle
-      :> Post '[JSON] ArticleResult
+      :> ReqBody '[JSON] (ArticleApi T.NewArticle)
+      :> Post '[JSON] (ArticleApi T.ArticleGet)
   :<|> AuthProtect "required"
       :> Capture "slug" T.Slug
-      :> ReqBody '[JSON] T.UpdateArticle
-      :> Put '[JSON] ArticleResult
+      :> ReqBody '[JSON] (ArticleApi T.UpdateArticle)
+      :> Put '[JSON] (ArticleApi T.ArticleGet)
   :<|> AuthProtect "required"
       :> Capture "slug" T.Slug
       :> Delete '[JSON] Text
@@ -198,18 +205,14 @@ type ArticleApi =
       :> QueryParam "favourited" FavBy
       :> QueryParam "tag" T.Tag
       :> Get '[JSON] ArticlesResult
-  :<|> AuthProtect "required"
-      :> QueryParam "limit" Offset
-      :> QueryParam "offset" Limit
-      :> Get '[JSON] ArticlesResult
 
-getArticle :: Db.HasDbConn env => Maybe Db.User -> T.Slug -> Rio env ArticleResult
+getArticle :: Db.HasDbConn env => Maybe Db.User -> T.Slug -> Rio env (ArticleApi T.ArticleGet)
 getArticle mUser slug =
-  ArticleResult <$>
+  ArticleApi <$>
     (Db.getArticle (#userId <$> mUser) slug >>= throwNotFound "Article not found")
 
-newArticle :: Db.HasDbConn env => Db.User -> T.NewArticle -> Rio env ArticleResult
-newArticle user@Db.User{userId} na = do
+newArticle :: Db.HasDbConn env => Db.User -> ArticleApi T.NewArticle -> Rio env (ArticleApi T.ArticleGet)
+newArticle user@Db.User{userId} (ArticleApi na) = do
   (a, _) <- Db.newArticle userId na
   getArticle (Just user) (#slug a)
 
@@ -217,9 +220,9 @@ updateArticle ::
      Db.HasDbConn env
   => Db.User
   -> T.Slug
-  -> T.UpdateArticle
-  -> Rio env ArticleResult
-updateArticle user@Db.User{username, userId} slug uA = do
+  -> ArticleApi T.UpdateArticle
+  -> Rio env (ArticleApi T.ArticleGet)
+updateArticle user@Db.User{username, userId} slug (ArticleApi uA) = do
   article <- (Db.getArticle Nothing slug >>= throwNotFound "Article not found")
   when ((#username (#author article)) /= username) $ throw NotAuthorized
   Db.updateArticle userId slug uA
@@ -274,31 +277,31 @@ getFeed Db.User{userId} offset limit =
    in toArticlesResult <$> Db.getArticles (Just userId) query
 
 
-articleServer :: Db.HasDbConn env => ServerT ArticleApi (Rio env)
+articleServer :: Db.HasDbConn env => ServerT ArticlesApi (Rio env)
 articleServer =
-  getArticle
+  getFeed
+  :<|> getArticle
   :<|> newArticle
   :<|> updateArticle
   :<|> deleteArticle
   :<|> getArticles
-  :<|> getFeed
 
 type FavoriteApi =
   AuthProtect "required"
       :> Capture "slug" T.Slug
       :> "favorite"
-      :> Post '[JSON] ArticleResult
+      :> Post '[JSON] (ArticleApi T.ArticleGet)
   :<|> AuthProtect "required"
       :> Capture "slug" T.Slug
       :> "favorite"
-      :> Delete '[JSON] ArticleResult
+      :> Delete '[JSON] (ArticleApi T.ArticleGet)
 
-favorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env ArticleResult
+favorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env (ArticleApi T.ArticleGet)
 favorite user@Db.User{userId} slug = do
   Db.favorite userId slug
   getArticle (Just user) slug
 
-unfavorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env ArticleResult
+unfavorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env (ArticleApi T.ArticleGet)
 unfavorite user@Db.User{userId} slug = do
   Db.unfavorite userId slug
   getArticle (Just user) slug
@@ -308,6 +311,13 @@ favoriteServer :: Db.HasDbConn env => ServerT FavoriteApi (Rio env)
 favoriteServer =
   favorite
   :<|> unfavorite
+
+data CommentPost a = CommentPost
+  { comment :: a
+  }
+  deriving (Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
 
 data CommentResult = CommentResult
   { comments :: [T.Comment]
@@ -323,7 +333,7 @@ type CommentApi =
   :<|> AuthProtect "required"
       :> Capture "slug" T.Slug
       :> "comments"
-      :> ReqBody '[JSON] T.NewComment
+      :> ReqBody '[JSON] (CommentPost T.NewComment)
       :> Post '[JSON] CommentResult
   :<|> AuthProtect "required"
       :> Capture "slug" T.Slug
@@ -345,14 +355,14 @@ getComments mUser slug = do
                 p
            ) comments
 
-comment ::
+newComment ::
      Db.HasDbConn env
   => Db.User
   -> T.Slug
-  -> T.NewComment
+  -> (CommentPost T.NewComment)
   -> Rio env CommentResult
-comment user slug newComment = do
-  Db.comment (#userId user) slug newComment
+newComment user slug (CommentPost nC) = do
+  Db.comment (#userId user) slug nC
   getComments (Just user) slug
 
 deleteComment ::
@@ -371,13 +381,13 @@ deleteComment Db.User{userId} _ commentId = do
 commentServer :: Db.HasDbConn env => ServerT CommentApi (Rio env)
 commentServer =
   getComments
-  :<|> comment
+  :<|> newComment
   :<|> deleteComment
 
 type Api = "api" :>
   ( "users" :> UsersApi
     :<|> "profiles" :> ProfileApi
-    :<|> "articles" :> ArticleApi
+    :<|> "articles" :> ArticlesApi
     :<|> "articles" :> FavoriteApi
     :<|> "articles" :> CommentApi
     :<|> "tags" :> Get '[JSON] (Set T.Tag)

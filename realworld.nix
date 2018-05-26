@@ -1,9 +1,9 @@
-{ mkDerivation, aeson, base, base-noprelude, beam-core
-, beam-postgres, bytestring, classy-prelude, conduit, containers
-, cryptonite, generic-lens, hspec, hspec-wai, hspec-wai-json, jose
-, lens, monad-control, mtl, postgresql-simple, resource-pool, rio
-, servant-server, stdenv, text, time, transformers, vector, wai
-, warp
+{ mkDerivation, aeson, base-noprelude, beam-core, beam-postgres
+, bytestring, classy-prelude, conduit, containers, cryptonite
+, generic-lens, hspec, hspec-wai, hspec-wai-json, jose, lens
+, monad-control, mtl, postgresql-simple
+, postgresql-simple-migration, resource-pool, rio, servant-server
+, stdenv, text, time, transformers, vector, wai, warp
 }:
 mkDerivation {
   pname = "realworld";
@@ -17,9 +17,12 @@ mkDerivation {
     monad-control mtl postgresql-simple resource-pool rio
     servant-server text time transformers vector wai warp
   ];
-  executableHaskellDepends = [ base classy-prelude warp ];
+  executableHaskellDepends = [
+    base-noprelude classy-prelude postgresql-simple
+    postgresql-simple-migration warp
+  ];
   testHaskellDepends = [
-    aeson base classy-prelude hspec hspec-wai hspec-wai-json
+    aeson base-noprelude classy-prelude hspec hspec-wai hspec-wai-json
   ];
   homepage = "https://github.com/githubuser/realworld#readme";
   license = stdenv.lib.licenses.bsd3;

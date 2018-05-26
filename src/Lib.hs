@@ -12,13 +12,17 @@ import Rio (runRio)
 import qualified Data.ByteString as BS
 
 authContext ::
-     Db.HasDbConn env
+     ( Db.HasDbConn env
+     , Db.HasDbPool env
+     )
   => env
   -> Context (AuthHandler Request Db.User ': AuthHandler Request (Maybe Db.User) ': '[])
 authContext env = (authHandler env) :. (authOptionalHandler env) :. EmptyContext
 
 authHandler ::
-     Db.HasDbConn env
+     ( Db.HasDbConn env
+     , Db.HasDbPool env
+     )
   => env
   -> AuthHandler Request (Db.User)
 authHandler env =
@@ -32,14 +36,16 @@ authHandler env =
               Left _ ->
                 throwError (err401 {errBody = "Wrong 'Authorization' token"})
               Right userId -> do
-                mUser <- liftIO $ runRio env $ Db.getUser userId
+                mUser <- liftIO $ runRio env $ Db.withPool $ Db.getUser userId
                 case mUser of
                   Just user -> pure user
                   Nothing -> throwError (err401 {errBody = "User doesn't exist"})
    in mkAuthHandler handler
 
 authOptionalHandler ::
-     Db.HasDbConn env
+     ( Db.HasDbConn env
+     , Db.HasDbPool env
+     )
   => env
   -> AuthHandler Request (Maybe Db.User)
 authOptionalHandler env =
@@ -53,7 +59,7 @@ authOptionalHandler env =
               Left _ ->
                 throwError (err401 {errBody = "Wrong 'Authorization' token"})
               Right userId -> do
-                mUser <- liftIO $ runRio env $ Db.getUser userId
+                mUser <- liftIO $ runRio env $ Db.withPool $ Db.getUser userId
                 case mUser of
                   Just user -> pure (Just user)
                   Nothing -> throwError (err401 {errBody = "User doesn't exist"})

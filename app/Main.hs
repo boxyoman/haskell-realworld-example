@@ -2,8 +2,13 @@ module Main where
 
 import ClassyPrelude
 import Network.Wai.Handler.Warp (run)
-import Database (ConnectionPool, Connection, ConnectInfo, createPool, connect)
+import Database (ConnectionPool, Connection, createPool, connect)
+import Database.PostgreSQL.Simple.Migration
+import Database.PostgreSQL.Simple
+  (close, withTransaction, defaultConnectInfo, ConnectInfo(..))
 import Lib (app)
+import System.Environment (getEnv)
+import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
 
 data Env = Env
   { dbPool :: ConnectionPool
@@ -11,12 +16,31 @@ data Env = Env
   } deriving (Generic)
 
 connInfo :: ConnectInfo
-connInfo = undefined
+connInfo = defaultConnectInfo
+  { connectUser = "realworld"
+  , connectPassword = "realworld"
+  , connectDatabase = "realworld"
+  }
+
+migrations :: Connection -> String -> IO (MigrationResult String)
+migrations conn migrationPath = do
+  result <- withTransaction conn $
+    runMigrations True conn
+      [ MigrationInitialization
+      , MigrationDirectory migrationPath
+      ]
+  pure result
 
 main :: IO ()
 main = do
+  hSetBuffering stdout LineBuffering
+  print connInfo
+  migrationPath <- getEnv "MIGRATIONS_PATH"
   pool <- createPool connInfo
-  -- Yes this is opened and never used.
   conn <- connect connInfo
   let env = Env pool conn
+  result <- migrations conn migrationPath
+  print result
+  -- ignore that fact that a reference to this connection still exists in env...
+  close conn
   run 8080 (app env)

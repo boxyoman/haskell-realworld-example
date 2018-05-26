@@ -105,7 +105,7 @@ data JWTError = JWTError JWT.JWTError
 
 
 gjwk :: JWT.JWK
-gjwk = JWT.fromOctets ("myVerySecretKey" :: ByteString)
+gjwk = JWT.fromOctets ("myVerySecretKeyThatNeedsToBeLongerIGuess:Shrug:" :: ByteString)
 
 mkJWT :: UserId -> IO Token
 mkJWT userId = do

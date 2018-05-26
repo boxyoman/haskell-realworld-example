@@ -68,6 +68,8 @@ import Database.Beam
   , update, runUpdate, (<-.), related_, runInsert, insert, insertFrom, exists_
   , runDelete, delete, pk, group_, aggregate_, Q, QExpr, count_, nub_
   , runSelectReturningList, subquery_, orderBy_, desc_, offset_, limit_
+  , withDbModification, dbModification, tableModification, modifyTable
+  , fieldNamed, FieldModification, TableField, leftJoin_, references_
   )
 import Password (PasswordHash, getHash)
 import qualified Types as T
@@ -80,7 +82,7 @@ import qualified Database.Beam.Postgres.Conduit as PgC
 import Data.Conduit ((.|), ConduitM)
 import qualified Data.Conduit as Conduit
 import qualified Data.Conduit.List as Conduit
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Set as Set
 import qualified Data.Vector as V
 import qualified Data.Pool as Pool
@@ -172,6 +174,7 @@ data ArticleT f = Article
   deriving Generic
   deriving anyclass (Beamable)
 
+
 type Article = ArticleT Identity
 
 instance Table ArticleT where
@@ -180,6 +183,8 @@ instance Table ArticleT where
     deriving anyclass (Beamable)
   primaryKey = ArticleId . #articleId
 
+-- unArticleId :: PrimaryKey ArticleT f -> Columnar f T.ArticleId
+-- unArticleId (ArticleId a) = a
 
 data ArticleTagT f = ArticleTag
   { articleId :: PrimaryKey ArticleT f
@@ -237,19 +242,71 @@ instance Table CommentT where
 
 
 data ConduitDb f = ConduitDb
-  { user :: f (TableEntity UserT)
-  , following :: f (TableEntity FollowingT)
-  , article :: f (TableEntity ArticleT)
-  , articleTags :: f (TableEntity ArticleTagT)
-  , favorites :: f (TableEntity FavoriteT)
-  , comments :: f (TableEntity CommentT)
+  { _user :: f (TableEntity UserT)
+  , _following :: f (TableEntity FollowingT)
+  , _article :: f (TableEntity ArticleT)
+  , _article_tag :: f (TableEntity ArticleTagT)
+  , _favorites :: f (TableEntity FavoriteT)
+  , _comments :: f (TableEntity CommentT)
   } deriving (Generic)
 
 instance Database be ConduitDb
 
 
 conduitDb :: DatabaseSettings be ConduitDb
-conduitDb = defaultDbSettings
+conduitDb = defaultDbSettings `withDbModification`
+            dbModification
+              { _user =
+                modifyTable id
+                  $ tableModification
+                    { userId = fieldNamed "user_id"
+                    , email = fieldNamed "email"
+                    , username = fieldNamed "username"
+                    , bio = fieldNamed "bio"
+                    , image = fieldNamed "image"
+                    , password = fieldNamed "password"
+                    }
+              , _following =
+                modifyTable id
+                 $ tableModification
+                   { userId = UserId $ fieldNamed "user_id"
+                   , following = UserId $ fieldNamed "following"
+                   }
+              , _article =
+                modifyTable id
+                 $ tableModification
+                   { articleId = fieldNamed "article_id"
+                   , userId = UserId $ fieldNamed "user_id"
+                   , slug = fieldNamed "slug"
+                   , title = fieldNamed "title"
+                   , description = fieldNamed "description"
+                   , body = fieldNamed "body"
+                   , createdAt = fieldNamed "created_at"
+                   , updatedAt = fieldNamed "updated_at"
+                   }
+              , _article_tag =
+                modifyTable id
+                 $ tableModification
+                   { articleId = ArticleId $ fieldNamed "article_id"
+                   , tag = fieldNamed "tag"
+                   }
+              , _favorites =
+                modifyTable id
+                 $ (tableModification
+                   { articleId = ArticleId $fieldNamed "article_id"
+                   , userId = UserId $ fieldNamed "user_id"
+                   } :: (FavoriteT (FieldModification (TableField FavoriteT))))
+              , _comments =
+                modifyTable id
+                 $ tableModification
+                   { commentId = fieldNamed "comment_id"
+                   , userId = UserId $ fieldNamed "user_id"
+                   , articleId = ArticleId $ fieldNamed "article_id"
+                   , body = fieldNamed "body"
+                   , createdAt = fieldNamed "created_at"
+                   , updatedAt = fieldNamed "updated_at"
+                   }
+              }
 
 
 
@@ -273,7 +330,7 @@ runInsertReturning pg cond = do
 
 qUserByUsername :: PgQExpr s T.Username -> PgQ s (UserT (PgQExpr s))
 qUserByUsername username = do
-  user <- all_ (#user conduitDb)
+  user <- all_ (#_user conduitDb)
   guard_ $ #username user ==. username
   pure user
 
@@ -283,19 +340,19 @@ insertUser T.NewUser{..} = do
   let insertValues =
         insertExpressions
           [ User default_ (val_ email) (val_ username) (val_ "") (val_ "") (val_ phash)]
-      thing = Pg.insertReturning (#user conduitDb) insertValues Pg.onConflictDefault (Just id)
+      thing = Pg.insertReturning (#_user conduitDb) insertValues Pg.onConflictDefault (Just id)
   [user] <- runInsertReturning thing (\c -> Conduit.runConduit $ c .| Conduit.consume)
   pure user
 
 
 getUser :: HasDbConn env => T.UserId -> Rio env (Maybe User)
 getUser userId = do
-  runBeam $ runSelectReturningOne $ lookup_ (#user conduitDb) (UserId userId)
+  runBeam $ runSelectReturningOne $ lookup_ (#_user conduitDb) (UserId userId)
 
 getUserByEmail :: HasDbConn env => T.Email -> Rio env (Maybe User)
 getUserByEmail email =
   runBeam $ runSelectReturningOne $ select $ do
-    user <- all_ (#user conduitDb)
+    user <- all_ (#_user conduitDb)
     guard_ $ (#email user) ==. val_ email
     pure user
 
@@ -311,7 +368,7 @@ maybeUpdate c row =
 updateUser :: HasDbConn env => T.UserId -> T.UserMaybes -> Rio env ()
 updateUser userId T.User{..} =
   runBeam $ runUpdate $
-    update (#user conduitDb)
+    update (#_user conduitDb)
            (\u ->
              (  maybeUpdate u (#username) username
              <> maybeUpdate u (#email) email
@@ -324,7 +381,7 @@ updateUser userId T.User{..} =
 
 qIsFollowing :: PgQExpr s (T.UserId) -> PgQExpr s T.UserId -> PgQExpr s Bool
 qIsFollowing userId fUserId = exists_ $ do
-  following <- all_ (#following conduitDb)
+  following <- all_ (#_following conduitDb)
   guard_ $ (#userId following) ==. (UserId userId)
   guard_ $ (#following following) ==. (UserId fUserId)
   pure following
@@ -351,7 +408,7 @@ qGetProfile mUserId user = do
 getProfile :: HasDbConn env => Maybe T.UserId -> T.Username -> Rio env (Maybe T.Profile)
 getProfile  mUserId username = do
   mP <- runBeam $ runSelectReturningOne $ select $ do
-    user <- all_ (#user conduitDb)
+    user <- all_ (#_user conduitDb)
     guard_ $ (#username user) ==. val_ (username)
     p <- qGetProfile mUserId user
     pure p
@@ -362,25 +419,25 @@ getProfile  mUserId username = do
 isFollowing :: HasDbConn env => T.UserId -> T.Username -> Rio env Bool
 isFollowing userId username = do
   m <- runBeam $ runSelectReturningOne $ select $ do
-    following <- all_ (#following conduitDb)
+    following <- all_ (#_following conduitDb)
     guard_ $ (#userId following) ==. val_ (UserId userId)
-    fuser <- related_ (#user conduitDb) (#following following)
+    fuser <- related_ (#_user conduitDb) (#following following)
     guard_ $ (#username fuser) ==. val_ username
     pure fuser
   pure $ isJust m
 
 follow :: HasDbConn env => T.UserId -> T.Username -> Rio env ()
 follow userId username = do
-  runBeam $ runInsert $ insert (#following conduitDb) $ insertFrom $ do
+  runBeam $ runInsert $ insert (#_following conduitDb) $ insertFrom $ do
     user <- qUserByUsername (val_ username)
     pure $ Following (val_ (UserId userId)) (UserId (#userId user))
 
 unfollow :: HasDbConn env => T.UserId -> T.Username -> Rio env ()
 unfollow userId username = do
-  runBeam $ runDelete $ delete (#following conduitDb)
+  runBeam $ runDelete $ delete (#_following conduitDb)
     (\f -> exists_ $ do
         guard_ $ (#userId f) ==. val_ (UserId userId)
-        fuser <- related_ (#user conduitDb) (#following f)
+        fuser <- related_ (#_user conduitDb) (#following f)
         guard_ $ (#username fuser) ==. val_ username
         pure fuser
     )
@@ -403,7 +460,7 @@ newArticle userId T.NewArticle{..} = do
           ]
       insertArticle' =
         Pg.insertReturning
-          (#article conduitDb)
+          (#_article conduitDb)
           insertArticle
           Pg.onConflictDefault
           (Just id)
@@ -413,7 +470,7 @@ newArticle userId T.NewArticle{..} = do
         $ Set.toList tagList
       insertTags' articleId =
         Pg.insertReturning
-          (#articleTags conduitDb)
+          (#_article_tag conduitDb)
           (insertTags articleId)
           Pg.onConflictDefault
           (Just id)
@@ -426,14 +483,16 @@ newArticle userId T.NewArticle{..} = do
 -- | Anything set to Nothing in T.UpdateArticle won't be updated
 updateArticle ::
   HasDbConn env => T.UserId -> T.Slug -> T.UpdateArticle -> Rio env ()
-updateArticle userId slug T.UpdateArticle{..} =
+updateArticle userId slug T.UpdateArticle{..} = do
+  now <- liftIO $ getCurrentTime
   runBeam $ runUpdate $
-    update (#article conduitDb)
+    update (#_article conduitDb)
            (\a ->
              (  maybeUpdate a (#title) title
              <> maybeUpdate a (#description) description
              <> maybeUpdate a (#body) body
              <> maybeUpdate a (#slug) ((flip T.mkSlug) userId <$> title)
+             <> [ #updatedAt a <-. val_ now]
              )
            )
            (\a -> #slug a ==. val_ slug)
@@ -444,63 +503,66 @@ deleteArticle ::
   -> Rio env ()
 deleteArticle slug = do
   runBeam $ do
-    runDelete $ delete (#articleTags conduitDb)
+    runDelete $ delete (#_article_tag conduitDb)
       (\tag -> exists_ $ do
         a <- qArticleBySlug (val_ slug)
         guard_ $ #articleId tag ==. pk a
         pure tag
       )
 
-    runDelete $ delete (#article conduitDb)
+    runDelete $ delete (#_article conduitDb)
       (\a -> #slug a ==. val_ slug)
 
-qArticleTags :: PgQ s (PrimaryKey ArticleT (PgQExpr s), (PgQExpr s (Vector T.Tag)))
+-- Will have issues when there aren't any tags...
+qArticleTags :: PgQ s (PgQExpr s T.ArticleId, PgQExpr s (Vector (Maybe T.Tag)))
 qArticleTags =
   aggregate_ (\(articleId, tag) -> (group_ articleId, Pg.pgArrayAgg tag)) $ do
-    tag <- all_ (#articleTags conduitDb)
-    pure (#articleId tag, #tag tag)
+    article <- all_ (_article conduitDb)
+    tag <- leftJoin_ (all_ (#_article_tag conduitDb)) (\tag -> #articleId tag `references_` article)
+    pure (#articleId article, #tag tag)
 
+qIsFavorited :: PgQExpr s T.UserId -> PgQExpr s T.ArticleId -> PgQExpr s Bool
+qIsFavorited userId articleId = exists_ $ do
+  fav <- all_ (#_favorites conduitDb)
+  guard_ $ (#userId fav) ==. (UserId userId)
+  guard_ $ (#articleId fav) ==. (ArticleId articleId)
+  pure fav
+
+
+qFavoriteCount ::
+  PgQ s (PgQExpr s T.ArticleId, PgQExpr s Int64)
+qFavoriteCount =
+  aggregate_ (\(a, u) -> (group_ a, count_ u)) $ do
+    article <- all_ (_article conduitDb)
+    fav <- leftJoin_ (all_ (#_favorites conduitDb)) (\fav -> #articleId fav `references_` article)
+    pure (#articleId article, unUserId $ #userId fav)
 
 qArticle ::
   Maybe T.UserId
   -> PgQ s
       ( ArticleT (PgQExpr s)
-      , PgQExpr s (Vector T.Tag)
+      , PgQExpr s (Vector (Maybe T.Tag))
       , QExprProfile s
       , PgQExpr s Bool
       , PgQExpr s Int64
       )
 qArticle mUserId = do
-    article <- all_ (#article conduitDb)
+    article <- all_ (#_article conduitDb)
     (articleId, tag) <- qArticleTags
-    guard_ $ articleId ==. pk article
-    user <- related_ (#user conduitDb) (#userId article)
+    guard_ $ articleId ==. #articleId article
+    user <- related_ (#_user conduitDb) (#userId article)
     profile <- qGetProfile mUserId user
     (favAId, favCount) <- qFavoriteCount
-    guard_ $ favAId ==. pk article
+    guard_ $ favAId ==. #articleId article
     let isFav = case mUserId of
                   Just userId -> qIsFavorited (val_ userId) (#articleId article)
                   Nothing -> val_ False
     pure (article, tag, profile, isFav, favCount)
 
 
-qIsFavorited :: PgQExpr s T.UserId -> PgQExpr s T.ArticleId -> PgQExpr s Bool
-qIsFavorited userId articleId = exists_ $ do
-  fav <- all_ (#favorites conduitDb)
-  guard_ $ (#userId fav) ==. (UserId userId)
-  guard_ $ (#articleId fav) ==. (ArticleId articleId)
-  pure fav
 
-
-qFavoriteCount ::  PgQ s (PrimaryKey ArticleT (PgQExpr s), (PgQExpr s (Int64)))
-qFavoriteCount =
-  aggregate_ (\(a, u) -> (group_ a, count_ u)) $ do
-    fav <- all_ (#favorites conduitDb)
-    pure (#articleId fav, unUserId $ #userId fav)
-
-
-qTagToArray :: T.Tag -> PgQExpr s (Vector T.Tag)
-qTagToArray tag = subquery_ $ aggregate_ Pg.pgArrayAgg $ pure (val_ tag)
+qTagToArray :: T.Tag -> PgQExpr s (Vector (Maybe T.Tag))
+qTagToArray tag = subquery_ $ aggregate_ Pg.pgArrayAgg $ pure (val_ (Just tag))
 
 
 qArticleQuery ::
@@ -508,7 +570,7 @@ qArticleQuery ::
   -> T.ArticleQuery
   -> PgQ s
       ( ArticleT (PgQExpr s)
-      , PgQExpr s (Vector T.Tag)
+      , PgQExpr s (Vector (Maybe T.Tag))
       , QExprProfile s
       , PgQExpr s Bool
       , PgQExpr s Int64
@@ -524,7 +586,7 @@ qArticleQuery mUserId T.ArticleQuery{..} =
       Nothing -> pure ()
     case (mUserId, isFollow) of
       (Just userId, True) ->
-        void $ related_ (#following conduitDb)
+        void $ related_ (#_following conduitDb)
                         (FollowingKey (UserId (val_ userId)) (#userId article))
       _ -> pure ()
     case mfavoritedBy of
@@ -534,14 +596,14 @@ qArticleQuery mUserId T.ArticleQuery{..} =
       Nothing -> pure ()
     pure a
 
-toArticle :: (Article, Vector T.Tag, Profile, Bool, Int64) -> T.ArticleGet
+toArticle :: (Article, Vector (Maybe T.Tag), Profile, Bool, Int64) -> T.ArticleGet
 toArticle (a, tags, p, isFav, favCount) =
   T.ArticleGet
     (#slug a)
     (#title a)
     (#description a)
     (#body a)
-    (Set.fromList (V.toList tags))
+    (Set.fromList $ catMaybes $ V.toList tags)
     (#createdAt a)
     (#updatedAt a)
     isFav
@@ -577,13 +639,13 @@ getTags ::
   => Rio env (Set T.Tag)
 getTags = do
   tags <- runBeam $ runSelectReturningList $ select $ nub_ $ do
-    #tag <$> all_ (#articleTags conduitDb)
+    #tag <$> all_ (#_article_tag conduitDb)
   pure $ Set.fromList tags
 
 
 qArticleBySlug :: PgQExpr s T.Slug -> PgQ s (ArticleT (PgQExpr s))
 qArticleBySlug slug = do
-  article <- all_ (#article conduitDb)
+  article <- all_ (#_article conduitDb)
   guard_ $ #slug article ==. slug
   pure article
 
@@ -593,7 +655,7 @@ favorite ::
   -> T.Slug
   -> Rio env ()
 favorite userId slug =
-  runBeam $ runInsert $ insert (#favorites conduitDb) $ insertFrom $ do
+  runBeam $ runInsert $ insert (#_favorites conduitDb) $ insertFrom $ do
     article <- qArticleBySlug (val_ slug)
     pure $ Favorite (ArticleId (#articleId article)) (val_ (UserId userId))
 
@@ -603,7 +665,7 @@ unfavorite ::
   -> T.Slug
   -> Rio env ()
 unfavorite userId slug = do
-  runBeam $ runDelete $ delete (#favorites conduitDb)
+  runBeam $ runDelete $ delete (#_favorites conduitDb)
     (\f -> exists_ $ do
       article <- qArticleBySlug (val_ slug)
       guard_ $ ArticleId (#articleId article) ==. (#articleId f)
@@ -619,7 +681,7 @@ comment ::
   -> T.NewComment
   -> Rio env ()
 comment userId slug T.NewComment{body} =
-  runBeam $ runInsert $ insert (#comments conduitDb) $ insertFrom $ do
+  runBeam $ runInsert $ insert (#_comments conduitDb) $ insertFrom $ do
     article <- qArticleBySlug (val_ slug)
     pure $ Comment
       default_
@@ -637,9 +699,9 @@ getComments ::
 getComments mUserId slug = do
   cps <- runBeam $ runSelectReturningList $ select $ do
     article <- qArticleBySlug (val_ slug)
-    com <- all_ (#comments conduitDb)
+    com <- all_ (#_comments conduitDb)
     guard_ $ #articleId com ==. ArticleId (#articleId article)
-    user <- related_ (#user conduitDb) (#userId com)
+    user <- related_ (#_user conduitDb) (#userId com)
     profile <- qGetProfile mUserId user
     pure (com, profile)
   pure $ over (each . _2) toProfile cps
@@ -650,7 +712,7 @@ getCommentById ::
   => T.CommentId
   -> Rio env (Maybe Comment)
 getCommentById commentId =
-  runBeam $ runSelectReturningOne $ lookup_ (#comments conduitDb) (CommentId commentId)
+  runBeam $ runSelectReturningOne $ lookup_ (#_comments conduitDb) (CommentId commentId)
 
 
 deleteComment ::
@@ -658,5 +720,5 @@ deleteComment ::
   => T.CommentId
   -> Rio env ()
 deleteComment commentId =
-  runBeam $ runDelete $ delete (#comments conduitDb)
+  runBeam $ runDelete $ delete (#_comments conduitDb)
     (\c -> #commentId c ==. val_ commentId)
