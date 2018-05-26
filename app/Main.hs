@@ -9,6 +9,9 @@ import Database.PostgreSQL.Simple
 import Lib (app)
 import System.Environment (getEnv)
 import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
+import qualified Network.Wai.Middleware.Cors as Cors
+import Network.Wai.Middleware.RequestLogger (logStdoutDev)
+import qualified Network.Wai as Wai
 
 data Env = Env
   { dbPool :: ConnectionPool
@@ -31,6 +34,28 @@ migrations conn migrationPath = do
       ]
   pure result
 
+corsPolicies :: Cors.CorsResourcePolicy
+corsPolicies =
+  Cors.CorsResourcePolicy
+  { Cors.corsOrigins = Nothing -- gives you /*
+  , Cors.corsMethods = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]
+  , Cors.corsRequestHeaders =
+      [ "Authorization"
+      , "authorization"
+      , "Content-Type"
+      ] <>
+      Cors.simpleHeaders
+  , Cors.corsExposedHeaders = Nothing
+  , Cors.corsMaxAge = Nothing
+  , Cors.corsVaryOrigin = False
+  , Cors.corsRequireOrigin = False
+  , Cors.corsIgnoreFailures = False
+  }
+
+
+myCors :: Wai.Middleware
+myCors = Cors.cors (const $ Just corsPolicies)
+
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
@@ -43,4 +68,8 @@ main = do
   print result
   -- ignore that fact that a reference to this connection still exists in env...
   close conn
-  run 8080 (app env)
+  run 8080 (logStdoutDev $ myCors $ app env)
+
+
+
+

@@ -90,6 +90,10 @@ executable realworld-exe
                      , realworld
                      , classy-prelude
                      , warp
+                     , wai
+                     , wai-cors
+                     , wai-logger
+                     , wai-extra
                      , postgresql-simple
                      , postgresql-simple-migration
   default-language:    Haskell2010

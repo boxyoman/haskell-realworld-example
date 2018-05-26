@@ -3,7 +3,8 @@
 , generic-lens, hspec, hspec-wai, hspec-wai-json, jose, lens
 , monad-control, mtl, postgresql-simple
 , postgresql-simple-migration, resource-pool, rio, servant-server
-, stdenv, text, time, transformers, vector, wai, warp
+, stdenv, text, time, transformers, vector, wai, wai-cors
+, wai-extra, wai-logger, warp
 }:
 mkDerivation {
   pname = "realworld";
@@ -19,7 +20,7 @@ mkDerivation {
   ];
   executableHaskellDepends = [
     base-noprelude classy-prelude postgresql-simple
-    postgresql-simple-migration warp
+    postgresql-simple-migration wai wai-cors wai-extra wai-logger warp
   ];
   testHaskellDepends = [
     aeson base-noprelude classy-prelude hspec hspec-wai hspec-wai-json

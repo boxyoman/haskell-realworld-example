@@ -48,6 +48,11 @@ Find out what the IP Address of the virtual machine is
 
     nixops info -d
 
+View logs of the server
+
+    nixops ssh -d realworld backend
+
+    journalctl -u api.service -f
 
 ## Making changes
 
