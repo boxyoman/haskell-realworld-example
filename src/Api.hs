@@ -261,8 +261,8 @@ getArticles mUser limit offset author favBy tag =
         T.ArticleQuery
           (maybe 20 unLimit limit)
           (maybe 0 unOffset offset)
-          (unAuthor <$> author)
           (unFavBy <$> favBy)
+          (unAuthor <$> author)
           tag
           False
    in toArticlesResult <$> (Db.getArticles (#userId <$> mUser) query)
