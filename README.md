@@ -28,7 +28,7 @@ to setup NixOps, otherwise
     nix-env -i nixops
 
 You'll also need [VirtualBox](https://www.virtualbox.org). You'll need to do
-once wierd setup of VirtualBox
+one wierd setup of VirtualBox
 
     VBoxManage hostonlyif create
 
