@@ -190,8 +190,8 @@ newtype FavBy = FavBy { unFavBy :: T.Username}
 type ArticlesApi =
   "feed"
       :>AuthProtect "required"
-      :> QueryParam "limit" Offset
-      :> QueryParam "offset" Limit
+      :> QueryParam "limit" Limit
+      :> QueryParam "offset" Offset
       :> Get '[JSON] ArticlesResult
   :<|> AuthProtect "optional"
       :> Capture "slug" T.Slug
@@ -207,8 +207,8 @@ type ArticlesApi =
       :> Capture "slug" T.Slug
       :> Delete '[JSON] Text
   :<|> AuthProtect "optional"
-      :> QueryParam "limit" Offset
-      :> QueryParam "offset" Limit
+      :> QueryParam "limit" Limit
+      :> QueryParam "offset" Offset
       :> QueryParam "author" Author
       :> QueryParam "favourited" FavBy
       :> QueryParam "tag" T.Tag
@@ -250,13 +250,13 @@ deleteArticle Db.User{username} slug = do
 getArticles ::
      Db.HasDbConn env
   => Maybe Db.User
-  -> Maybe Offset
   -> Maybe Limit
+  -> Maybe Offset
   -> Maybe Author
   -> Maybe FavBy
   -> Maybe T.Tag
   -> Rio env ArticlesResult
-getArticles mUser offset limit author favBy tag =
+getArticles mUser limit offset author favBy tag =
   let query =
         T.ArticleQuery
           (maybe 20 unLimit limit)
@@ -270,10 +270,10 @@ getArticles mUser offset limit author favBy tag =
 getFeed ::
      Db.HasDbConn env
   => Db.User
-  -> Maybe Offset
   -> Maybe Limit
+  -> Maybe Offset
   -> Rio env ArticlesResult
-getFeed Db.User{userId} offset limit =
+getFeed Db.User{userId} limit offset =
   let query =
         T.ArticleQuery
           (maybe 20 unLimit limit)
