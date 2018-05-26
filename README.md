@@ -51,7 +51,7 @@ Find out what the IP Address of the virtual machine is
 
 ## Making changes
 
-Make you change and get into a Nix Shell to compile
+Make your change and get into a Nix Shell to compile
 
     nix-shell shell.nix
 
