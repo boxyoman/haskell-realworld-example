@@ -128,6 +128,8 @@ data UserT f = User
   , bio       :: Columnar f Text
   , image     :: Columnar f Text
   , password  :: Columnar f PasswordHash
+  , createdAt   :: Columnar f UTCTime
+  , updatedAt   :: Columnar f UTCTime
   }
   deriving Generic
   deriving anyclass (Beamable)
@@ -266,6 +268,8 @@ conduitDb = defaultDbSettings `withDbModification`
                     , bio = fieldNamed "bio"
                     , image = fieldNamed "image"
                     , password = fieldNamed "password"
+                    , createdAt = fieldNamed "created_at"
+                    , updatedAt = fieldNamed "updated_at"
                     }
               , _following =
                 modifyTable id
@@ -340,11 +344,19 @@ insertUser T.NewUser{..} = do
   phash <- liftIO $ getHash password
   let insertValues =
         insertExpressions
-          [ User default_ (val_ email) (val_ username) (val_ "") (val_ "") (val_ phash)]
+          [ User
+              default_
+              (val_ email)
+              (val_ username)
+              (val_ "")
+              (val_ "")
+              (val_ phash)
+              default_
+              default_
+          ]
       thing = Pg.insertReturning (#_user conduitDb) insertValues Pg.onConflictDefault (Just id)
   [user] <- runInsertReturning thing (\c -> Conduit.runConduit $ c .| Conduit.consume)
   pure user
-
 
 getUser :: HasDbConn env => T.UserId -> Rio env (Maybe User)
 getUser userId = do
@@ -367,7 +379,8 @@ maybeUpdate c row =
 
 -- | Anything set to Nothing in T.UserMaybes won't be updated
 updateUser :: HasDbConn env => T.UserId -> T.UserMaybes -> Rio env ()
-updateUser userId T.User{..} =
+updateUser userId T.User{..} = do
+  now <- liftIO getCurrentTime
   runBeam $ runUpdate $
     update (#_user conduitDb)
            (\u ->
@@ -375,6 +388,7 @@ updateUser userId T.User{..} =
              <> maybeUpdate u (#email) email
              <> maybeUpdate u (#bio) bio
              <> maybeUpdate u (#image) image
+             <> [ #updatedAt u <-. val_ now]
              )
            )
            (\u -> #userId u ==. val_ userId)
@@ -485,7 +499,7 @@ newArticle userId T.NewArticle{..} = do
 updateArticle ::
   HasDbConn env => T.Slug -> T.UpdateArticle -> Rio env ()
 updateArticle slug T.UpdateArticle{..} = do
-  now <- liftIO $ getCurrentTime
+  now <- liftIO getCurrentTime
   runBeam $ runUpdate $
     update (#_article conduitDb)
            (\a ->

@@ -67,7 +67,7 @@ type UsersApi =
 dbUserToUser :: Db.User -> Rio env T.UserGet
 dbUserToUser Db.User{..} = do
   token <- liftIO $ T.mkJWT userId
-  pure $ T.UserGet email username token bio image
+  pure $ T.UserGet email username token bio image createdAt updatedAt
 
 newuser :: Db.HasDbConn env => UserBody T.NewUser -> Rio env (UserBody T.UserGet)
 newuser (UserBody newUser) = do

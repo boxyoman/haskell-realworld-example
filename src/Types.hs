@@ -152,10 +152,10 @@ type family HKD (f :: Type -> Type) a where
 
 
 data User' f = User
-  { email     :: HKD f Email
-  , username  :: HKD f Username
-  , bio       :: HKD f Text
-  , image  :: HKD f Text
+  { email    :: HKD f Email
+  , username :: HKD f Username
+  , bio      :: HKD f Text
+  , image    :: HKD f Text
   }
   deriving (Generic)
 
@@ -172,7 +172,9 @@ data UserGet = UserGet
   , username  :: Username
   , token     :: Token
   , bio       :: Text
-  , image  :: Text
+  , image     :: Text
+  , createdAt :: UTCTime
+  , updatedAt :: UTCTime
   }
   deriving (Generic)
   deriving anyclass (FromJSON, ToJSON)

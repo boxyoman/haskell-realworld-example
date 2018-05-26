@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS "user"
   , bio Text NOT NULL
   , image Text NOT NULL
   , password Text NOT NULL
+  , created_at timestamptz NOT NULL DEFAULT NOW()
+  , updated_at timestamptz NOT NULL DEFAULT NOW()
   , PRIMARY KEY (user_id)
   , UNIQUE (email)
   , UNIQUE (username)
