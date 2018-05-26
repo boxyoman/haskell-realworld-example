@@ -15,6 +15,7 @@ module Api
     , CommentResult(..)
     , NotFound(..)
     , NotAuthorized(..)
+    , TagsResult(..)
     , server
     ) where
 
@@ -337,7 +338,7 @@ type CommentApi =
       :> Capture "slug" T.Slug
       :> "comments"
       :> ReqBody '[JSON] (CommentPost T.NewComment)
-      :> Post '[JSON] CommentResult
+      :> Post '[JSON] (CommentPost T.Comment)
   :<|> AuthProtect "required"
       :> Capture "slug" T.Slug
       :> "comments"
@@ -363,10 +364,18 @@ newComment ::
   => Db.User
   -> T.Slug
   -> (CommentPost T.NewComment)
-  -> Rio env CommentResult
+  -> Rio env (CommentPost T.Comment)
 newComment user slug (CommentPost nC) = do
-  Db.comment (#userId user) slug nC
-  getComments (Just user) slug
+  article <- Db.articleBySlug slug >>= throwNotFound "article not found"
+  (c, p) <- Db.newComment (#userId user) (#articleId article) nC >>= throwNotFound "comment not found"
+  pure
+    $ CommentPost
+    $ T.Comment
+      (#commentId c)
+      (#body c)
+      (#createdAt c)
+      (#updatedAt c)
+      p
 
 deleteComment ::
      Db.HasDbConn env
@@ -387,6 +396,13 @@ commentServer =
   :<|> newComment
   :<|> deleteComment
 
+data TagsResult = TagsResult
+  { tags :: Set T.Tag
+  }
+  deriving (Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+
 type Api = "api" :>
   ( "users" :> UsersApi
     :<|> "user" :> UserApi
@@ -394,7 +410,7 @@ type Api = "api" :>
     :<|> "articles" :> ArticlesApi
     :<|> "articles" :> FavoriteApi
     :<|> "articles" :> CommentApi
-    :<|> "tags" :> Get '[JSON] (Set T.Tag)
+    :<|> "tags" :> Get '[JSON] TagsResult
   )
 
 server :: Db.HasDbConn env => ServerT Api (Rio env)
@@ -405,4 +421,4 @@ server =
   :<|> articleServer
   :<|> favoriteServer
   :<|> commentServer
-  :<|> Db.getTags
+  :<|> (TagsResult <$> Db.getTags)

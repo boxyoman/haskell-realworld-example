@@ -42,6 +42,7 @@ module Database
   , newArticle
   , getArticle
   , getArticles
+  , articleBySlug
   , updateArticle
   , deleteArticle
   , getTags
@@ -55,7 +56,7 @@ module Database
   -- * Comments
   , CommentT(..)
   , Comment
-  , comment
+  , newComment
   , getComments
   , getCommentById
   , deleteComment
@@ -610,6 +611,16 @@ toArticle (a, tags, p, isFav, favCount) =
     favCount
     (toProfile p)
 
+articleBySlug ::
+     HasDbConn env
+  => T.Slug
+  -> Rio env (Maybe Article)
+articleBySlug slug = do
+  runBeam $ runSelectReturningOne $ select $ do
+    article <- all_ (#_article conduitDb)
+    guard_ $ #slug article ==. val_ slug
+    pure article
+
 
 getArticle ::
      HasDbConn env
@@ -674,22 +685,32 @@ unfavorite userId slug = do
     )
 
 
-comment ::
+newComment ::
      HasDbConn env
   => T.UserId
-  -> T.Slug
+  -> T.ArticleId
   -> T.NewComment
-  -> Rio env ()
-comment userId slug T.NewComment{body} =
-  runBeam $ runInsert $ insert (#_comments conduitDb) $ insertFrom $ do
-    article <- qArticleBySlug (val_ slug)
-    pure $ Comment
-      default_
-      (val_ (UserId userId))
-      (ArticleId (#articleId article))
-      (val_ body)
-      default_
-      default_
+  -> Rio env (Maybe (Comment, T.Profile))
+newComment userId articleId T.NewComment{body} = do
+  let insertValues =
+        insertExpressions
+          [Comment
+            default_
+            (val_ $ UserId userId)
+            (val_ $ ArticleId articleId)
+            (val_ body)
+            default_
+            default_
+          ]
+      thing = Pg.insertReturning (#_comments conduitDb) insertValues Pg.onConflictDefault (Just id)
+  [Comment{commentId}] <- runInsertReturning thing (\c -> Conduit.runConduit $ c .| Conduit.consume)
+  comment <- runBeam $ runSelectReturningOne $ select $ do
+    com <- all_ (#_comments conduitDb)
+    guard_ $ #commentId com ==. val_ commentId
+    user <- related_ (#_user conduitDb) (#userId com)
+    profile <- qGetProfile (Just userId) user
+    pure (com, profile)
+  pure $ over (_Just . _2) toProfile comment
 
 getComments ::
      HasDbConn env
