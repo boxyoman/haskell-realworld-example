@@ -13,10 +13,6 @@ We've gone to great lengths to adhere to the **[Haskell/Servant/Beam]** communit
 For more information on how to this works with other frontends/backends, head over to the [RealWorld](https://github.com/gothinkster/realworld) repo.
 
 
-# How it works
-
-> TODO
-
 # Getting started
 
 ## Installation
@@ -67,3 +63,24 @@ Make your change and get into a Nix Shell to compile
 Deploying changes to the VM
 
     nixops deploy -d realworld
+
+# How it works
+
+[Servant](https://haskell-servant.readthedocs.io/en/stable/) is used for the
+routing. The source code for all the routing and handling can be found in
+`src/Api.hs`.
+
+[Beam](http://hackage.haskell.org/package/beam-core) is used for generating
+queries to the database. The code for handling database requests is found in
+`src/Database.hs`.
+
+Types that are common to both modules are found in `src/Types.hs`. There are
+lots of `newtypes` to make it harder to mix up arguments when passing them
+around to different functions.
+
+Authentication is done in `src/Lib.hs`. It's not very pretty, but it gets the
+job done.
+
+The `main` function is in `app/Main.hs`, it setups up the webserver on port
+8080, CORS to accept data from any host, database migrations, and simple logging
+for the webserver.
