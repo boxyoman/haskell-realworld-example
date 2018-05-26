@@ -47,3 +47,18 @@ Create and deploy the NixOps config
 Find out what the IP Address of the virtual machine is
 
     nixops info -d
+
+
+## Making changes
+
+Make you change and get into a Nix Shell to compile
+
+    nix-shell shell.nix
+
+    cabal configure
+
+    cabal build
+
+Deploying changes to the VM
+
+    nixops deploy -d realworld
