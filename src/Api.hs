@@ -3,7 +3,7 @@
 
 module Api
     ( Api
-    , UserApi(..)
+    , UserBody(..)
     , ProfileResult(..)
     , ArticleApi(..)
     , Offset(..)
@@ -40,13 +40,11 @@ throwNotFound str Nothing = throw (NotFound str)
 type instance AuthServerData (AuthProtect "required") = Db.User
 type instance AuthServerData (AuthProtect "optional") = Maybe Db.User
 
-data UserApi a = UserApi
+data UserBody a = UserBody
   { user :: a
   }
   deriving (Generic)
   deriving anyclass (FromJSON, ToJSON)
-
-
 
 
 data LoginData = LoginData
@@ -59,16 +57,10 @@ data LoginData = LoginData
 
 type UsersApi =
   "login"
-      :> ReqBody '[JSON] (UserApi LoginData)
-      :> Post '[JSON] (UserApi T.UserGet)
-  :<|> ReqBody '[JSON] (UserApi T.NewUser)
-      :> Post '[JSON] (UserApi T.UserGet)
-  :<|> AuthProtect "required"
-      :> Get '[JSON] (UserApi T.UserGet)
-  :<|> AuthProtect "required"
-      :> ReqBody '[JSON] (UserApi T.UserMaybes)
-      :> Put '[JSON] (UserApi T.UserGet)
-
+      :> ReqBody '[JSON] (UserBody LoginData)
+      :> Post '[JSON] (UserBody T.UserGet)
+  :<|> ReqBody '[JSON] (UserBody T.NewUser)
+      :> Post '[JSON] (UserBody T.UserGet)
 
 
 dbUserToUser :: Db.User -> Rio env T.UserGet
@@ -76,38 +68,49 @@ dbUserToUser Db.User{..} = do
   token <- liftIO $ T.mkJWT userId
   pure $ T.UserGet email username token bio image
 
-newuser :: Db.HasDbConn env => UserApi T.NewUser -> Rio env (UserApi T.UserGet)
-newuser (UserApi newUser) = do
+newuser :: Db.HasDbConn env => UserBody T.NewUser -> Rio env (UserBody T.UserGet)
+newuser (UserBody newUser) = do
   dbUser <- Db.insertUser newUser
-  UserApi <$> dbUserToUser dbUser
+  UserBody <$> dbUserToUser dbUser
 
-getUser :: Db.User -> Rio env (UserApi T.UserGet)
-getUser user =
-  UserApi <$> dbUserToUser user
-
-loginUser :: Db.HasDbConn env => UserApi LoginData -> Rio env (UserApi T.UserGet)
-loginUser (UserApi LoginData{..}) = do
+loginUser :: Db.HasDbConn env => UserBody LoginData -> Rio env (UserBody T.UserGet)
+loginUser (UserBody LoginData{..}) = do
   mUser <- Db.getUserByEmail email
   case mUser of
     Just user@Db.User{password = passwordHash} ->
       if comparePassword password passwordHash
-         then UserApi <$> dbUserToUser user
+         then UserBody <$> dbUserToUser user
          else throw NotAuthorized
     Nothing -> throw NotAuthorized
 
-updateUser :: Db.HasDbConn env => Db.User -> (UserApi T.UserMaybes) -> Rio env (UserApi T.UserGet)
-updateUser Db.User{userId} (UserApi uUser) = do
-  Db.updateUser userId uUser
-  Just dbUser <- Db.getUser userId
-  UserApi <$> dbUserToUser dbUser
-
-userServer :: Db.HasDbConn env => ServerT UsersApi (Rio env)
-userServer =
+usersServer :: Db.HasDbConn env => ServerT UsersApi (Rio env)
+usersServer =
   loginUser
   :<|> newuser
-  :<|> getUser
-  :<|> updateUser
 
+type UserApi =
+  AuthProtect "required"
+      :> Get '[JSON] (UserBody T.UserGet)
+  :<|> AuthProtect "required"
+      :> ReqBody '[JSON] (UserBody T.UserMaybes)
+      :> Put '[JSON] (UserBody T.UserGet)
+
+getUser :: Db.User -> Rio env (UserBody T.UserGet)
+getUser user =
+  UserBody <$> dbUserToUser user
+
+
+updateUser :: Db.HasDbConn env => Db.User -> (UserBody T.UserMaybes) -> Rio env (UserBody T.UserGet)
+updateUser Db.User{userId} (UserBody uUser) = do
+  Db.updateUser userId uUser
+  Just dbUser <- Db.getUser userId
+  UserBody <$> dbUserToUser dbUser
+
+
+userServer :: Db.HasDbConn env => ServerT UserApi (Rio env)
+userServer =
+  getUser
+  :<|> updateUser
 
 
 data ProfileResult = ProfileResult
@@ -386,6 +389,7 @@ commentServer =
 
 type Api = "api" :>
   ( "users" :> UsersApi
+    :<|> "user" :> UserApi
     :<|> "profiles" :> ProfileApi
     :<|> "articles" :> ArticlesApi
     :<|> "articles" :> FavoriteApi
@@ -395,7 +399,8 @@ type Api = "api" :>
 
 server :: Db.HasDbConn env => ServerT Api (Rio env)
 server =
-  userServer
+  usersServer
+  :<|> userServer
   :<|> profileServer
   :<|> articleServer
   :<|> favoriteServer
