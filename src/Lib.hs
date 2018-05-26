@@ -1,5 +1,5 @@
 
-module Lib (app) where
+module Lib (app, Errors(..), ErrorBody(..)) where
 
 import Servant
 import Servant.Server.Experimental.Auth
@@ -10,6 +10,22 @@ import qualified Api
 import Network.Wai (Application, Request(..))
 import Rio (runRio)
 import qualified Data.ByteString as BS
+import Data.Aeson (FromJSON, ToJSON, encode)
+
+data Errors = Errors
+  { errors :: ErrorBody
+  }
+  deriving (Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+data ErrorBody = ErrorBody
+  { body :: [Text]
+  }
+  deriving (Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+toError :: Text -> LByteString
+toError err = encode (Errors (ErrorBody [err]))
 
 authContext ::
      ( Db.HasDbConn env
@@ -29,17 +45,17 @@ authHandler env =
   let handler req =
         case lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
           Nothing ->
-            throwError (err401 {errBody = "Missing 'Authorization' header"})
+            throwError (err401 {errBody = toError "Missing 'Authorization' header"})
           Just token -> do
             eUserId <- liftIO $ T.decodeJWT token
             case eUserId of
               Left _ ->
-                throwError (err401 {errBody = "Wrong 'Authorization' token"})
+                throwError (err401 {errBody = toError "Wrong 'Authorization' token"})
               Right userId -> do
                 mUser <- liftIO $ runRio env $ Db.withPool $ Db.getUser userId
                 case mUser of
                   Just user -> pure user
-                  Nothing -> throwError (err401 {errBody = "User doesn't exist"})
+                  Nothing -> throwError (err401 {errBody = toError "User doesn't exist"})
    in mkAuthHandler handler
 
 authOptionalHandler ::
@@ -57,19 +73,21 @@ authOptionalHandler env =
             eUserId <- liftIO $ T.decodeJWT token
             case eUserId of
               Left _ ->
-                throwError (err401 {errBody = "Wrong 'Authorization' token"})
+                throwError (err401 {errBody = toError "Wrong 'Authorization' token"})
               Right userId -> do
                 mUser <- liftIO $ runRio env $ Db.withPool $ Db.getUser userId
                 case mUser of
                   Just user -> pure (Just user)
-                  Nothing -> throwError (err401 {errBody = "User doesn't exist"})
+                  Nothing -> throwError (err401 {errBody = toError "User doesn't exist"})
    in mkAuthHandler handler
 
 
 catchErrors :: Rio env a -> Rio env (Either ServantErr a)
 catchErrors a =
-  catch' (\(_ :: Api.NotAuthorized) -> pure $ Left err401 {errBody = "Not Authorized to preform this action"})
-  . catch' (\(Api.NotFound str :: Api.NotFound) -> pure $ Left err404 {errBody = encodeUtf8 (fromStrict str) })
+  catch' (\(_ :: Api.NotAuthorized) ->
+    pure $ Left err401 {errBody = toError "Not Authorized to preform this action"})
+  . catch' (\(Api.NotFound str :: Api.NotFound) ->
+    pure $ Left err404 {errBody = toError str })
   $ (fmap Right a)
 
   where

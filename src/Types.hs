@@ -232,7 +232,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Title where
 
 mkSlug :: Title ->  Slug
 mkSlug (Title str) =
-  Slug $ (T.intercalate "-" (words str))
+  Slug $ (T.intercalate "-" (words $ T.toLower str))
 
 newtype Description = Description { unDescription :: Text }
   deriving (Generic, Show)
