@@ -580,7 +580,7 @@ qArticleQuery ::
       , PgQExpr s Int64
       )
 qArticleQuery mUserId T.ArticleQuery{..} =
-  limit_ limit $ offset_ offset $ orderBy_ (desc_ . #createdAt . view _1 ) $ do
+  limit_ limit $ offset_ offset $ orderBy_ (desc_ . #createdAt . view _1 ) $ nub_ $ do
     article <- all_ (#_article conduitDb)
     case mtag of
       Just tag -> do
