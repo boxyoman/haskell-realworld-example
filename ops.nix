@@ -14,7 +14,7 @@ let
       networking.firewall.allowedTCPPorts = [ 22 5432 8080 ];
       systemd.services.api = {
         description = "api-server";
-        after = [ "network.target" ];
+        after = [ "postgresql.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           WorkingDirectory = "${api}";
