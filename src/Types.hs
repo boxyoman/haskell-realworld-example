@@ -4,7 +4,7 @@ module Types
   ( -- * General Stuff
     HKD
     -- * User Stuff
-  , UserId(..)
+  , UserId
   , Username
   , Email
   , UpdateUser(..)
@@ -20,7 +20,7 @@ module Types
   , decodeJWT
 
   -- * Article Stuff
-  , ArticleId(..)
+  , ArticleId
   , Slug(..)
   , mkSlug
   , Title(..)
@@ -33,9 +33,9 @@ module Types
   , ArticleQuery(..)
 
   -- * Comment Stuff
-  , CommentId(..)
+  , CommentId
+  , CommentBody
   , NewComment(..)
-  , CommentBody(..)
   , Comment(..)
   ) where
 
@@ -56,26 +56,25 @@ import qualified Crypto.JWT as JWT
 import Data.Time (getCurrentTime, UTCTime)
 
 
-newtype UserId = UserId {unUserId :: Int64}
-  deriving (Generic, Eq)
-  deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON, FromJSON)
+newtype NewType p a = NewType a
+  deriving (Generic, Eq, Show)
+  deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData)
 
-instance FromBackendRow Pg.Postgres UserId
-instance HasSqlEqualityCheck PgExpressionSyntax UserId
+instance Wrapped (NewType p a) where
+  type Unwrapped (NewType p a) = a
+  _Wrapped' = _GWrapped'
+instance (FromField a, FromBackendRow Pg.Postgres a) => FromBackendRow Pg.Postgres (NewType p a)
+instance HasSqlEqualityCheck be a => HasSqlEqualityCheck be (NewType p a)
+instance HasSqlValueSyntax be a => HasSqlValueSyntax be (NewType p a) where
+  sqlValueSyntax = sqlValueSyntax . unwrap
 
-instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be UserId where
-  sqlValueSyntax = sqlValueSyntax . unUserId
 
-newtype Username = Username {unUsername :: Text}
-  deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
+data UserId'
+type UserId = NewType UserId' Int64
 
-instance FromBackendRow Pg.Postgres Username
-instance HasSqlEqualityCheck PgExpressionSyntax Username
+data Username'
+type Username = NewType Username' Text
 
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Username where
-  sqlValueSyntax = sqlValueSyntax . unUsername
 
 newtype Token = Token Text
   deriving (Generic, Show )
@@ -192,16 +191,9 @@ data Profile = Profile
   deriving anyclass (ToJSON)
 
 
-newtype ArticleId = ArticleId {unArticleId :: Int64}
-  deriving (Generic)
-  deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON)
+data ArticleId'
+type ArticleId = NewType ArticleId' Int64
 
-instance FromBackendRow Pg.Postgres ArticleId
-instance HasSqlEqualityCheck PgExpressionSyntax ArticleId
-
-instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be ArticleId where
-  sqlValueSyntax = sqlValueSyntax . unArticleId
 
 
 newtype Slug = Slug { unSlug :: Text }
@@ -306,27 +298,12 @@ data UpdateArticle = UpdateArticle
   deriving anyclass (FromJSON)
 
 
-newtype CommentId = CommentId {unCommentId :: Int64}
-  deriving (Generic, Show)
-  deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData)
-
-instance FromBackendRow Pg.Postgres CommentId
-instance HasSqlEqualityCheck PgExpressionSyntax CommentId
-
-instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be CommentId where
-  sqlValueSyntax = sqlValueSyntax . unCommentId
+data CommentId'
+type CommentId = NewType CommentId' Int64
 
 
-newtype CommentBody = CommentBody { unCommentBody :: Text }
-  deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField)
-
-instance FromBackendRow Pg.Postgres CommentBody
-instance HasSqlEqualityCheck PgExpressionSyntax CommentBody
-
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be CommentBody where
-  sqlValueSyntax = sqlValueSyntax . unCommentBody
+data CommentBody'
+type CommentBody = NewType CommentBody' Text
 
 
 data NewComment = NewComment

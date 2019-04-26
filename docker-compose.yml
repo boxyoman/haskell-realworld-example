@@ -1,0 +1,10 @@
+version: '3'
+services:
+  backend:
+    build: .
+    ports:
+    - "8080"
+    links:
+    - postgres
+  postgres:
+    image: postgres

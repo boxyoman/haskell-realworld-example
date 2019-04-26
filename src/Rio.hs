@@ -2,9 +2,11 @@
 
 module Rio where
 
-import ClassyPrelude
-import Control.Monad.Fail
+import Relude
 import Control.Monad.Reader (withReaderT)
+import Control.Monad.Trans.Control
+import Control.Monad.Base
+import Control.Monad.Catch
 
 
 newtype Rio e a = Rio { unRio :: ReaderT e IO a }

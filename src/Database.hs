@@ -318,7 +318,7 @@ conduitDb = defaultDbSettings `withDbModification`
 runBeam :: HasDbConn env => Pg.Pg a -> Rio env a
 runBeam pg = do
   conn <- asks #dbConn
-  liftIO $ Pg.runBeamPostgresDebug (putStrLn . pack) conn pg
+  liftIO $ Pg.runBeamPostgresDebug putStrLn conn pg
 
 
 

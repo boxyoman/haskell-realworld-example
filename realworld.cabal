@@ -25,11 +25,14 @@ library
   build-depends:       base-noprelude >= 4.7 && < 5
                      , aeson
                      , cryptonite
-                     , classy-prelude
+                     , relude
                      , conduit
                      , rio
                      , lens
+                     , exceptions
+                     , safe-exceptions
                      , monad-control
+                     , transformers-base
                      , generic-lens
                      , servant-server
                      , wai
@@ -88,7 +91,6 @@ executable realworld-exe
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O0
   build-depends:       base-noprelude
                      , realworld
-                     , classy-prelude
                      , warp
                      , wai
                      , wai-cors
@@ -124,7 +126,6 @@ executable realworld-exe
                     , RecordWildCards
                     , LambdaCase
                     , TypeApplications
-                    , NoImplicitPrelude
 
 source-repository head
   type:     git

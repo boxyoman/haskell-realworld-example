@@ -52,13 +52,10 @@ comparePassword = runPassword
 --  comparePassword :: Password -> PasswordHash -> Bool
 --  comparePassword password passwordHash :: Bool
 
-instance Show Password where
-  show _ = "**********"
-
 instance FromJSON Password where
   parseJSON (String str) =
     pure $ Password $
-      BCrypt.validatePassword (encodeUtf8 str) . encodeUtf8 . unPasswordHash
+      BCrypt.validatePassword @ByteString @ByteString (encodeUtf8 str) . encodeUtf8 . unPasswordHash
   parseJSON x = typeMismatch "passwords are strings" x
 
 -- | Only here to help documentation. Doesn't actually return the plain text
@@ -82,7 +79,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be PasswordHash where
 
 hashPassword :: (MonadRandom m) => Text -> m PasswordHash
 hashPassword str =
-  fmap (PasswordHash . decodeUtf8) (BCrypt.hashPassword 10 bytestring)
+  fmap (PasswordHash . decodeUtf8 @Text @ByteString) (BCrypt.hashPassword 10 bytestring)
     where
       bytestring :: ByteString
       bytestring = encodeUtf8 str
@@ -98,8 +95,6 @@ getHash ::
 getHash = runNewPassword
 
 
-instance Show NewPassword where
-  show _ = "**********"
 
 instance FromJSON NewPassword where
   parseJSON (String str) =

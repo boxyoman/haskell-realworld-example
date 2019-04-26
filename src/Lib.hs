@@ -11,6 +11,7 @@ import Network.Wai (Application, Request(..))
 import Rio (runRio)
 import qualified Data.ByteString as BS
 import Data.Aeson (FromJSON, ToJSON, encode)
+import qualified Data.List as List
 
 data Errors = Errors
   { errors :: ErrorBody
@@ -27,12 +28,14 @@ data ErrorBody = ErrorBody
 toError :: Text -> LByteString
 toError err = encode (Errors (ErrorBody [err]))
 
+type MyContext = AuthHandler Request Db.User ': AuthHandler Request (Maybe Db.User) ': '[]
+
 authContext ::
      ( Db.HasDbConn env
      , Db.HasDbPool env
      )
   => env
-  -> Context (AuthHandler Request Db.User ': AuthHandler Request (Maybe Db.User) ': '[])
+  -> Context MyContext
 authContext env = (authHandler env) :. (authOptionalHandler env) :. EmptyContext
 
 authHandler ::
@@ -43,7 +46,7 @@ authHandler ::
   -> AuthHandler Request (Db.User)
 authHandler env =
   let handler req =
-        case lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
+        case List.lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
           Nothing ->
             throwError (err401 {errBody = toError "Missing 'Authorization' header"})
           Just token -> do
@@ -66,7 +69,7 @@ authOptionalHandler ::
   -> AuthHandler Request (Maybe Db.User)
 authOptionalHandler env =
   let handler req =
-        case lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
+        case List.lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
           Nothing ->
             pure Nothing
           Just token -> do
@@ -98,21 +101,24 @@ catchErrors a =
 toHandler ::
      (Db.HasDbConn env, Db.HasDbPool env)
   => env
-  -> (Rio env :~> Handler)
-toHandler env =
-  NT $ \rio -> do
-    ea <- liftIO $ runRio env (catchErrors (Db.withPool rio))
-    case ea of
-      Left e -> throwError e
-      Right a -> pure a
+  -> (Rio env a -> Handler a)
+toHandler env rio = do
+  ea <- liftIO $ runRio env (catchErrors (Db.withPool rio))
+  case ea of
+    Left e -> throwError e
+    Right a -> pure a
 
-server ::
-     (Db.HasDbConn env, Db.HasDbPool env)
-  => env -> Server Api.Api
-server env =
-  enter (toHandler env) Api.server
 
 app ::
      (Db.HasDbConn env, Db.HasDbPool env)
   => env -> Application
-app env = serveWithContext (Proxy @Api.Api) (authContext env) (server env)
+app env =
+  serveWithContext
+    (Proxy @Api.Api)
+    (authContext env)
+    (hoistServerWithContext
+      (Proxy @Api.Api)
+      (Proxy @MyContext)
+      (toHandler env)
+      (Api.server)
+    )

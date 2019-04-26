@@ -1,1 +1,7 @@
-(import ./default.nix {}).env
+(import ./. {}).pkgs.haskellPackages.shellFor {
+  packages = p :
+    [ p.realworld
+    ];
+  withHoogle = true;
+}
+

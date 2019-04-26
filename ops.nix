@@ -1,6 +1,6 @@
 let
   system = "x86_64-linux";
-  api = import ./default.nix { inherit system; };
+  api = import ./default.nix { inherit system; }.realworld;
   migrations = ./migrations;
   pkgs = import ./pkgs.nix { inherit system; };
 

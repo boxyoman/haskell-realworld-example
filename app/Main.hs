@@ -1,6 +1,5 @@
 module Main where
 
-import ClassyPrelude
 import Network.Wai.Handler.Warp (run)
 import Database (ConnectionPool, Connection, createPool, connect)
 import Database.PostgreSQL.Simple.Migration

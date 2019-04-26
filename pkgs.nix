@@ -4,8 +4,8 @@ let
   nixpkgs = fetchFromGitHub {
       owner = "NixOS";
       repo = "nixpkgs-channels";
-      rev = "06c576b0525da85f2de86b3c13bb796d6a0c20f6";
-      sha256 = "01cra89drfjf3yhii5na0j5ivap2wcs0h8i0xcxrjs946nk4pp5j";
+      rev = "571b40d3f50466d3e91c1e609d372de96d782793";
+      sha256 = "0qjpkx2b5pac1nqr5chvlrlcyyk294w2079ybf88p95qxkqbbby5";
     };
 in
   import nixpkgs a
