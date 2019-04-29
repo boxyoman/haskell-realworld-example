@@ -34,10 +34,10 @@ library
                      , monad-control
                      , transformers-base
                      , generic-lens
-                     , servant-server
+                     , servant-server >= 0.14.0 && < 0.16
                      , wai
                      , warp
-                     , beam-core
+                     , beam-core >= 0.7.2.2 && < 0.8
                      , beam-postgres
                      , postgresql-simple
                      , jose

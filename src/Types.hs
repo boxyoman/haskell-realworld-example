@@ -21,12 +21,12 @@ module Types
 
   -- * Article Stuff
   , ArticleId
-  , Slug(..)
+  , Slug
   , mkSlug
-  , Title(..)
-  , Description(..)
-  , Body(..)
-  , Tag(..)
+  , Title
+  , Description
+  , Body
+  , Tag
   , NewArticle(..)
   , ArticleGet(..)
   , UpdateArticle(..)
@@ -58,7 +58,7 @@ import Data.Time (getCurrentTime, UTCTime)
 
 newtype NewType p a = NewType a
   deriving (Generic, Eq, Show)
-  deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData)
+  deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData, Ord)
 
 instance Wrapped (NewType p a) where
   type Unwrapped (NewType p a) = a
@@ -195,62 +195,29 @@ data ArticleId'
 type ArticleId = NewType ArticleId' Int64
 
 
-
-newtype Slug = Slug { unSlug :: Text }
-  deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
-
-instance FromBackendRow Pg.Postgres Slug
-instance HasSqlEqualityCheck PgExpressionSyntax Slug
-
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Slug where
-  sqlValueSyntax = sqlValueSyntax . unSlug
+data Title'
+type Title = NewType Title' Text
 
 
-newtype Title = Title { unTitle :: Text }
-  deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
-
-instance FromBackendRow Pg.Postgres Title
-instance HasSqlEqualityCheck PgExpressionSyntax Title
-
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Title where
-  sqlValueSyntax = sqlValueSyntax . unTitle
+data Slug'
+type Slug = NewType Slug' Text
 
 mkSlug :: Title ->  Slug
-mkSlug (Title str) =
-  Slug $ (T.intercalate "-" (words $ T.toLower str))
-
-newtype Description = Description { unDescription :: Text }
-  deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
-
-instance FromBackendRow Pg.Postgres Description
-instance HasSqlEqualityCheck PgExpressionSyntax Description
-
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Description where
-  sqlValueSyntax = sqlValueSyntax . unDescription
-
-newtype Body = Body { unBody :: Text }
-  deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
-
-instance FromBackendRow Pg.Postgres Body
-instance HasSqlEqualityCheck PgExpressionSyntax Body
-
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Body where
-  sqlValueSyntax = sqlValueSyntax . unBody
+mkSlug title =
+  NewType $ (T.intercalate "-" (words $ T.toLower (unwrap title)))
 
 
-newtype Tag = Tag { unTag :: Text }
-  deriving (Generic, Show, Ord, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
-instance FromBackendRow Pg.Postgres Tag
-instance HasSqlEqualityCheck PgExpressionSyntax Tag
+data Description'
+type Description = NewType Description' Text
 
-instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Tag where
-  sqlValueSyntax = sqlValueSyntax . unTag
+data Body'
+type Body = NewType Body' Text
+
+data Tag'
+type Tag = NewType Tag' Text
+
+
 data NewArticle = NewArticle
   { title :: Title
   , description :: Description

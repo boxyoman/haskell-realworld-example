@@ -1,6 +1,7 @@
 { system ? builtins.currentSystem } :
 let
   config = {
+    allowBroken = true;
     packageOverrides = pkgs: rec {
       haskellPackages =
         pkgs.haskellPackages.override {
@@ -17,5 +18,5 @@ let
 in
   {
     pkgs = pkgs;
-    realworkd = pkgs.haskellPackages.realworld;
+    realworld = pkgs.haskellPackages.realworld;
   }
