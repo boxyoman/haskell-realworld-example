@@ -265,7 +265,7 @@ getArticles mUser limit offset author favBy tag =
           (unAuthor <$> author)
           tag
           False
-   in toArticlesResult <$> (Db.getArticles (#userId <$> mUser) query)
+   in toArticlesResult <$> (Db.getArticles Nothing query)
 
 getFeed ::
      Db.HasDbConn env
