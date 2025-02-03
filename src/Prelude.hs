@@ -1,22 +1,24 @@
 module Prelude
-  ( module ClassyPrelude
+  ( module Relude
   , module Control.Lens
   , module Data.Generics.Product.Fields
-  , Type
+  , module UnliftIO
+  , module UnliftIO.Exception
   , Rio
   , MonadFail(..)
+  , Vector
   ) where
 
 
-import ClassyPrelude hiding
-  (Index, (<.>), uncons, (<|), index, unsnoc, cons, snoc, fail, delete, Handler)
-import Control.Monad.Fail
-import Control.Lens hiding (Context)
+import Relude
+import UnliftIO (MonadUnliftIO)
+import UnliftIO.Exception
+import Control.Lens hiding (Context, universe, uncons, (??))
 import Data.Generics.Product.Fields
-import Data.Kind (Type)
 import Rio (Rio)
-import GHC.OverloadedLabels
+import Crypto.Random (MonadRandom(..))
+import Data.Vector(Vector)
 
 
-instance HasField' field a b => IsLabel field (a -> b) where
-  fromLabel = getField @field
+instance MonadRandom m => MonadRandom (ExceptT e m) where
+  getRandomBytes = lift . getRandomBytes

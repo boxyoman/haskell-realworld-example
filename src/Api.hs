@@ -1,6 +1,3 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE OverloadedLabels #-}
-
 module Api
     ( Api
     , UserBody(..)
@@ -36,7 +33,7 @@ data NotAuthorized = NotAuthorized
 
 throwNotFound :: forall a env . Text -> Maybe a -> Rio env a
 throwNotFound _ (Just a) = pure a
-throwNotFound str Nothing = throw (NotFound str)
+throwNotFound str Nothing = throwIO (NotFound str)
 
 type instance AuthServerData (AuthProtect "required") = Db.User
 type instance AuthServerData (AuthProtect "optional") = Maybe Db.User
@@ -81,8 +78,8 @@ loginUser (UserBody LoginData{..}) = do
     Just user@Db.User{password = passwordHash} ->
       if comparePassword password passwordHash
          then UserBody <$> dbUserToUser user
-         else throw NotAuthorized
-    Nothing -> throw NotAuthorized
+         else throwIO NotAuthorized
+    Nothing -> throwIO NotAuthorized
 
 usersServer :: Db.HasDbConn env => ServerT UsersApi (Rio env)
 usersServer =
@@ -140,7 +137,7 @@ type ProfileApi =
 getProfile :: Db.HasDbConn env => Maybe Db.User -> T.Username -> Rio env ProfileResult
 getProfile mUser username = do
   ProfileResult
-    <$> (Db.getProfile (#userId <$> mUser) username >>= throwNotFound "User not found")
+    <$> (Db.getProfile ((.userId) <$> mUser) username >>= throwNotFound "User not found")
 
 follow :: Db.HasDbConn env => Db.User -> T.Username -> Rio env ProfileResult
 follow user@Db.User{userId} username = do
@@ -217,12 +214,12 @@ type ArticlesApi =
 getArticle :: Db.HasDbConn env => Maybe Db.User -> T.Slug -> Rio env (ArticleApi T.ArticleGet)
 getArticle mUser slug =
   ArticleApi <$>
-    (Db.getArticle (#userId <$> mUser) slug >>= throwNotFound "Article not found")
+    (Db.getArticle ((.userId) <$> mUser) slug >>= throwNotFound "Article not found")
 
 newArticle :: Db.HasDbConn env => Db.User -> ArticleApi T.NewArticle -> Rio env (ArticleApi T.ArticleGet)
 newArticle user@Db.User{userId} (ArticleApi na) = do
   (a, _) <- Db.newArticle userId na
-  getArticle (Just user) (#slug a)
+  getArticle (Just user) a.slug
 
 updateArticle ::
      Db.HasDbConn env
@@ -232,7 +229,7 @@ updateArticle ::
   -> Rio env (ArticleApi T.ArticleGet)
 updateArticle user@Db.User{username} slug (ArticleApi uA) = do
   article <- (Db.getArticle Nothing slug >>= throwNotFound "Article not found")
-  when ((#username (#author article)) /= username) $ throw NotAuthorized
+  when (article.author.username /= username) $ throwIO NotAuthorized
   Db.updateArticle slug uA
   getArticle (Just user) slug
 
@@ -243,7 +240,7 @@ deleteArticle ::
   -> Rio env Text
 deleteArticle Db.User{username} slug = do
   article <- (Db.getArticle Nothing slug >>= throwNotFound "Article not found")
-  when ((#username (#author article)) /= username) $ throw NotAuthorized
+  when (article.author.username /= username) $ throwIO NotAuthorized
   Db.deleteArticle slug
   pure "OK"
 
@@ -265,7 +262,7 @@ getArticles mUser limit offset author favBy tag =
           (unAuthor <$> author)
           tag
           False
-   in toArticlesResult <$> (Db.getArticles (#userId <$> mUser) query)
+   in toArticlesResult <$> (Db.getArticles ((.userId) <$> mUser) query)
 
 getFeed ::
      Db.HasDbConn env
@@ -312,7 +309,7 @@ favorite user@Db.User{userId} slug = do
 unfavorite :: Db.HasDbConn env => Db.User -> T.Slug -> Rio env (ArticleApi T.ArticleGet)
 unfavorite user@Db.User{userId} slug = do
   article <- Db.articleBySlug slug >>= throwNotFound "article not found"
-  Db.unfavorite userId (#articleId article)
+  Db.unfavorite userId article.articleId
   getArticle (Just user) slug
 
 
@@ -352,15 +349,15 @@ type CommentApi =
 
 getComments :: Db.HasDbConn env => Maybe Db.User -> T.Slug -> Rio env CommentResult
 getComments mUser slug = do
-  comments <- Db.getComments (#userId <$> mUser) slug
+  comments <- Db.getComments ((.userId) <$> mUser) slug
   pure
     $ CommentResult
     $ fmap (\ (c, p) ->
               T.Comment
-                (#commentId c)
-                (#body c)
-                (#createdAt c)
-                (#updatedAt c)
+                c.commentId
+                c.body
+                c.createdAt
+                c.updatedAt
                 p
            ) comments
 
@@ -372,14 +369,14 @@ newComment ::
   -> Rio env (CommentPost T.Comment)
 newComment user slug (CommentPost nC) = do
   article <- Db.articleBySlug slug >>= throwNotFound "article not found"
-  (c, p) <- Db.newComment (#userId user) (#articleId article) nC >>= throwNotFound "comment not found"
+  (c, p) <- Db.newComment user.userId article.articleId nC >>= throwNotFound "comment not found"
   pure
     $ CommentPost
     $ T.Comment
-      (#commentId c)
-      (#body c)
-      (#createdAt c)
-      (#updatedAt c)
+      c.commentId
+      c.body
+      c.createdAt
+      c.updatedAt
       p
 
 deleteComment ::
@@ -390,7 +387,7 @@ deleteComment ::
   -> Rio env Text
 deleteComment Db.User{userId} _ commentId = do
   com <- Db.getCommentById commentId >>= throwNotFound "Comment not found"
-  when (Db.unUserId (#userId com) /= userId) $ throw NotAuthorized
+  when (Db.unUserId com.userId /= userId) $ throwIO NotAuthorized
   Db.deleteComment commentId
   pure "OK"
 

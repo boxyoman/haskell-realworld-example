@@ -1,11 +1,4 @@
-a :
-let
-  inherit (import <nixpkgs> a) fetchFromGitHub;
-  nixpkgs = fetchFromGitHub {
-      owner = "NixOS";
-      repo = "nixpkgs-channels";
-      rev = "06c576b0525da85f2de86b3c13bb796d6a0c20f6";
-      sha256 = "01cra89drfjf3yhii5na0j5ivap2wcs0h8i0xcxrjs946nk4pp5j";
-    };
-in
-  import nixpkgs a
+import (builtins.fetchTarball {
+  url = "https://github.com/NixOS/nixpkgs/archive/b509d37a1a83d21d3c1d17aa86a20ed8c18e2a52.tar.gz";
+  sha256 = "0ixys2177x0vjyrssh8j8j34nbkk65bb7440rfyss345z9vkqbal";
+})

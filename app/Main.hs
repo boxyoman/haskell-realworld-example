@@ -1,6 +1,5 @@
 module Main where
 
-import ClassyPrelude
 import Network.Wai.Handler.Warp (run)
 import Database (ConnectionPool, Connection, createPool, connect)
 import Database.PostgreSQL.Simple.Migration
@@ -8,7 +7,7 @@ import Database.PostgreSQL.Simple
   (close, withTransaction, defaultConnectInfo, ConnectInfo(..))
 import Lib (app)
 import System.Environment (getEnv)
-import System.IO (BufferMode(LineBuffering), hSetBuffering, stdout)
+import System.IO (BufferMode(LineBuffering), stdout)
 import qualified Network.Wai.Middleware.Cors as Cors
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import qualified Network.Wai as Wai

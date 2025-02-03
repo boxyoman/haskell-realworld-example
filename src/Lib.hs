@@ -1,16 +1,19 @@
 
 module Lib (app, Errors(..), ErrorBody(..)) where
 
-import Servant
-import Servant.Server.Experimental.Auth
-       (AuthHandler, mkAuthHandler)
-import qualified Types as T
-import qualified Database as Db
-import qualified Api
-import Network.Wai (Application, Request(..))
-import Rio (runRio)
-import qualified Data.ByteString as BS
+import Api qualified
 import Data.Aeson (FromJSON, ToJSON, encode)
+import Data.ByteString qualified as BS
+import Data.List qualified as List
+import Database qualified as Db
+import Network.Wai (Request (..))
+import Rio (runRio)
+import Servant
+import Servant.Server.Experimental.Auth (
+  AuthHandler,
+  mkAuthHandler,
+ )
+import Types qualified as T
 
 data Errors = Errors
   { errors :: ErrorBody
@@ -32,8 +35,14 @@ authContext ::
      , Db.HasDbPool env
      )
   => env
-  -> Context (AuthHandler Request Db.User ': AuthHandler Request (Maybe Db.User) ': '[])
+  -> Context MyContext
 authContext env = (authHandler env) :. (authOptionalHandler env) :. EmptyContext
+
+type MyContext =
+  (  AuthHandler Request Db.User
+  ': AuthHandler Request (Maybe Db.User)
+  ': '[]
+  )
 
 authHandler ::
      ( Db.HasDbConn env
@@ -43,7 +52,7 @@ authHandler ::
   -> AuthHandler Request (Db.User)
 authHandler env =
   let handler req =
-        case lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
+        case List.lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
           Nothing ->
             throwError (err401 {errBody = toError "Missing 'Authorization' header"})
           Just token -> do
@@ -66,7 +75,7 @@ authOptionalHandler ::
   -> AuthHandler Request (Maybe Db.User)
 authOptionalHandler env =
   let handler req =
-        case lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
+        case List.lookup "Authorization" (requestHeaders req) >>= BS.stripPrefix "Token " of
           Nothing ->
             pure Nothing
           Just token -> do
@@ -82,7 +91,7 @@ authOptionalHandler env =
    in mkAuthHandler handler
 
 
-catchErrors :: Rio env a -> Rio env (Either ServantErr a)
+catchErrors :: Rio env a -> Rio env (Either ServerError a)
 catchErrors a =
   catch' (\(_ :: Api.NotAuthorized) ->
     pure $ Left err401 {errBody = toError "Not Authorized to preform this action"})
@@ -91,26 +100,32 @@ catchErrors a =
   $ (fmap Right a)
 
   where
-    catch' :: (Exception e, MonadCatch m) => (e -> m a) -> m a -> m a
+    catch' :: (Exception e, MonadUnliftIO m) => (e -> m a) -> m a -> m a
     catch' = flip catch
 
 
 toHandler ::
      (Db.HasDbConn env, Db.HasDbPool env)
   => env
-  -> (Rio env :~> Handler)
-toHandler env =
-  NT $ \rio -> do
+  -> Rio env a
+  -> Servant.Handler a
+toHandler env rio = do
     ea <- liftIO $ runRio env (catchErrors (Db.withPool rio))
     case ea of
       Left e -> throwError e
       Right a -> pure a
 
+
 server ::
      (Db.HasDbConn env, Db.HasDbPool env)
   => env -> Server Api.Api
 server env =
-  enter (toHandler env) Api.server
+  hoistServerWithContext
+    (Proxy @Api.Api)
+    (Proxy @MyContext)
+    (toHandler env)
+    Api.server
+
 
 app ::
      (Db.HasDbConn env, Db.HasDbPool env)

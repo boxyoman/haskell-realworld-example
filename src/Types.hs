@@ -62,7 +62,7 @@ newtype UserId = UserId {unUserId :: Int64}
   deriving newtype (FromField, ToJSON, FromJSON)
 
 instance FromBackendRow Pg.Postgres UserId
-instance HasSqlEqualityCheck PgExpressionSyntax UserId
+instance HasSqlEqualityCheck Pg.Postgres UserId
 
 instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be UserId where
   sqlValueSyntax = sqlValueSyntax . unUserId
@@ -72,7 +72,7 @@ newtype Username = Username {unUsername :: Text}
   deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Username
-instance HasSqlEqualityCheck PgExpressionSyntax Username
+instance HasSqlEqualityCheck Pg.Postgres Username
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Username where
   sqlValueSyntax = sqlValueSyntax . unUsername
@@ -110,7 +110,7 @@ mkJWT userId = do
   claims <- mkClaims userId
   eJWT <- doJwtSign gjwk claims
   case eJWT of
-    Left e -> throw (JWTError e)
+    Left e -> throwIO (JWTError e)
     Right bytes ->
       pure $ Token $ toStrict $ decodeUtf8 $ JWT.encodeCompact bytes
 
@@ -138,7 +138,7 @@ newtype Email = Email {unEmail :: Text}
   deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Email
-instance HasSqlEqualityCheck PgExpressionSyntax Email
+instance HasSqlEqualityCheck Pg.Postgres Email
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Email where
   sqlValueSyntax = sqlValueSyntax . unEmail
@@ -198,7 +198,7 @@ newtype ArticleId = ArticleId {unArticleId :: Int64}
   deriving newtype (FromField, ToJSON)
 
 instance FromBackendRow Pg.Postgres ArticleId
-instance HasSqlEqualityCheck PgExpressionSyntax ArticleId
+instance HasSqlEqualityCheck Pg.Postgres ArticleId
 
 instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be ArticleId where
   sqlValueSyntax = sqlValueSyntax . unArticleId
@@ -209,7 +209,7 @@ newtype Slug = Slug { unSlug :: Text }
   deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Slug
-instance HasSqlEqualityCheck PgExpressionSyntax Slug
+instance HasSqlEqualityCheck Pg.Postgres Slug
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Slug where
   sqlValueSyntax = sqlValueSyntax . unSlug
@@ -220,7 +220,7 @@ newtype Title = Title { unTitle :: Text }
   deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Title
-instance HasSqlEqualityCheck PgExpressionSyntax Title
+instance HasSqlEqualityCheck Pg.Postgres Title
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Title where
   sqlValueSyntax = sqlValueSyntax . unTitle
@@ -234,7 +234,7 @@ newtype Description = Description { unDescription :: Text }
   deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Description
-instance HasSqlEqualityCheck PgExpressionSyntax Description
+instance HasSqlEqualityCheck Pg.Postgres Description
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Description where
   sqlValueSyntax = sqlValueSyntax . unDescription
@@ -244,7 +244,7 @@ newtype Body = Body { unBody :: Text }
   deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres Body
-instance HasSqlEqualityCheck PgExpressionSyntax Body
+instance HasSqlEqualityCheck Pg.Postgres Body
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Body where
   sqlValueSyntax = sqlValueSyntax . unBody
@@ -255,7 +255,7 @@ newtype Tag = Tag { unTag :: Text }
   deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Tag
-instance HasSqlEqualityCheck PgExpressionSyntax Tag
+instance HasSqlEqualityCheck Pg.Postgres Tag
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Tag where
   sqlValueSyntax = sqlValueSyntax . unTag
@@ -312,7 +312,7 @@ newtype CommentId = CommentId {unCommentId :: Int64}
   deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres CommentId
-instance HasSqlEqualityCheck PgExpressionSyntax CommentId
+instance HasSqlEqualityCheck Pg.Postgres CommentId
 
 instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be CommentId where
   sqlValueSyntax = sqlValueSyntax . unCommentId
@@ -323,7 +323,7 @@ newtype CommentBody = CommentBody { unCommentBody :: Text }
   deriving newtype (FromJSON, ToJSON, FromField)
 
 instance FromBackendRow Pg.Postgres CommentBody
-instance HasSqlEqualityCheck PgExpressionSyntax CommentBody
+instance HasSqlEqualityCheck Pg.Postgres CommentBody
 
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be CommentBody where
   sqlValueSyntax = sqlValueSyntax . unCommentBody

@@ -1,9 +1,10 @@
+cabal-version:       3.0
 name:                realworld
 version:             0.1.0.0
 -- synopsis:
 -- description:
 homepage:            https://github.com/boxyoman/haskell-realworld-example/
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Jonathan Covert
 maintainer:          jonny.covert@gmail.com
@@ -11,135 +12,122 @@ copyright:           2018 Jonathan Covert
 category:            Web
 build-type:          Simple
 extra-source-files:  README.md
-cabal-version:       >=1.10
+
+
+common flags
+  ghc-options:
+    -Wall
+    -g
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wredundant-constraints
+    -Werror=missing-fields
+    -Werror=incomplete-patterns
+    -Wunused-packages
+
+common extensions
+  default-language:    Haskell2010
+  default-extensions:
+    OverloadedStrings,
+    FlexibleInstances,
+    FlexibleContexts,
+    TypeSynonymInstances,
+    TupleSections,
+    DeriveGeneric,
+    DeriveFunctor,
+    DeriveFoldable,
+    DeriveTraversable,
+    ScopedTypeVariables,
+    DeriveDataTypeable,
+    RankNTypes,
+    GADTs,
+    ConstraintKinds,
+    GeneralizedNewtypeDeriving,
+    DeriveAnyClass,
+    DerivingStrategies,
+    TypeInType,
+    PolyKinds,
+    TypeFamilies,
+    TypeFamilyDependencies,
+    FunctionalDependencies,
+    MultiParamTypeClasses,
+    TypeOperators,
+    DuplicateRecordFields,
+    NamedFieldPuns,
+    RecordWildCards,
+    LambdaCase,
+    TypeApplications,
+    QuantifiedConstraints,
+    OverloadedRecordDot,
+    ImportQualifiedPost,
+    PartialTypeSignatures,
 
 library
+  import: extensions, flags
   hs-source-dirs:      src
-  exposed-modules:     Api
-                     , Prelude
-                     , Database
-                     , Password
-                     , Types
-                     , Rio
-                     , Lib
-  build-depends:       base-noprelude >= 4.7 && < 5
-                     , aeson
-                     , cryptonite
-                     , classy-prelude
-                     , conduit
-                     , rio
-                     , lens
-                     , monad-control
-                     , generic-lens
-                     , servant-server
-                     , wai
-                     , warp
-                     , beam-core
-                     , beam-postgres
-                     , postgresql-simple
-                     , jose
-                     , time
-                     , text
-                     , bytestring
-                     , transformers
-                     , containers
-                     , vector
-                     , resource-pool
-                     , mtl
-  default-language:    Haskell2010
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O0
-  default-extensions: OverloadedStrings
-                    , FlexibleInstances
-                    , FlexibleContexts
-                    , TypeSynonymInstances
-                    , TupleSections
-                    , DeriveGeneric
-                    , DeriveFunctor
-                    , DeriveFoldable
-                    , DeriveTraversable
-                    , ScopedTypeVariables
-                    , DeriveDataTypeable
-                    , RankNTypes
-                    , GADTs
-                    , ConstraintKinds
-                    , GeneralizedNewtypeDeriving
-                    , DeriveAnyClass
-                    , DerivingStrategies
-                    , TypeInType
-                    , PolyKinds
-                    , TypeFamilies
-                    , TypeFamilyDependencies
-                    , FunctionalDependencies
-                    , MultiParamTypeClasses
-                    , TypeOperators
-                    , DuplicateRecordFields
-                    , NamedFieldPuns
-                    , RecordWildCards
-                    , LambdaCase
-                    , TypeApplications
+  exposed-modules:
+    Api,
+    Prelude,
+    Database,
+    Password,
+    Types,
+    Rio,
+    Lib
+  build-depends:
+    base-noprelude >= 4.7 && < 5,
+    aeson,
+    crypton,
+    unliftio,
+    relude,
+    conduit,
+    lens,
+    generic-lens,
+    servant-server,
+    wai,
+    warp,
+    beam-core,
+    beam-postgres,
+    postgresql-simple,
+    jose,
+    time,
+    text,
+    bytestring,
+    transformers,
+    containers,
+    vector,
+    unliftio-pool,
+    mtl,
+  ghc-options:
+    -threaded
+    -Wcompat
+    -O0
 
 source-repository head
   type:     git
   location: https://github.com/githubuser/realworld
 
 executable realworld-exe
+  import: extensions, flags
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O0
-  build-depends:       base-noprelude
-                     , realworld
-                     , classy-prelude
-                     , warp
-                     , wai
-                     , wai-cors
-                     , wai-logger
-                     , wai-extra
-                     , postgresql-simple
-                     , postgresql-simple-migration
-  default-language:    Haskell2010
-  default-extensions: OverloadedStrings
-                    , FlexibleInstances
-                    , FlexibleContexts
-                    , TypeSynonymInstances
-                    , TupleSections
-                    , DeriveGeneric
-                    , DeriveFunctor
-                    , DeriveFoldable
-                    , DeriveTraversable
-                    , ScopedTypeVariables
-                    , DeriveDataTypeable
-                    , RankNTypes
-                    , GADTs
-                    , ConstraintKinds
-                    , GeneralizedNewtypeDeriving
-                    , TypeInType
-                    , PolyKinds
-                    , TypeFamilies
-                    , TypeFamilyDependencies
-                    , FunctionalDependencies
-                    , MultiParamTypeClasses
-                    , TypeOperators
-                    , DuplicateRecordFields
-                    , NamedFieldPuns
-                    , RecordWildCards
-                    , LambdaCase
-                    , TypeApplications
-                    , NoImplicitPrelude
+  ghc-options:
+    -threaded
+    -rtsopts -with-rtsopts=-N
+    -Wcompat
+    -O0
+  build-depends:
+    base-noprelude,
+    realworld,
+    warp,
+    wai,
+    wai-cors,
+    wai-logger,
+    wai-extra,
+    postgresql-simple,
+    postgresql-simple-migration
+  default-extensions:
 
 source-repository head
   type:     git
   location: https://github.com/githubuser/realworld
 
-test-suite realworld-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
-  build-depends:       base-noprelude
-                     , realworld
-                     , classy-prelude
-                     , hspec
-                     , hspec-wai
-                     , hspec-wai-json
-                     , aeson
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  default-language:    Haskell2010

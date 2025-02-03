@@ -17,6 +17,7 @@ import Database.Beam.Backend.SQL.SQL92
 import qualified Database.Beam.Postgres as Pg
 import Database.Beam (FromBackendRow)
 import Database.PostgreSQL.Simple.FromField (FromField(..))
+import Text.Show (Show(..))
 
 -- $setup
 -- The code examples in this module require GHC's `OverloadedStrings`
@@ -58,7 +59,10 @@ instance Show Password where
 instance FromJSON Password where
   parseJSON (String str) =
     pure $ Password $
-      BCrypt.validatePassword (encodeUtf8 str) . encodeUtf8 . unPasswordHash
+      BCrypt.validatePassword
+        (encodeUtf8 @Text @ByteString str)
+        . encodeUtf8 @Text @ByteString
+        . unPasswordHash
   parseJSON x = typeMismatch "passwords are strings" x
 
 -- | Only here to help documentation. Doesn't actually return the plain text
@@ -82,7 +86,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be PasswordHash where
 
 hashPassword :: (MonadRandom m) => Text -> m PasswordHash
 hashPassword str =
-  fmap (PasswordHash . decodeUtf8) (BCrypt.hashPassword 10 bytestring)
+  fmap (PasswordHash . decodeUtf8 @Text @ByteString) (BCrypt.hashPassword 10 bytestring)
     where
       bytestring :: ByteString
       bytestring = encodeUtf8 str
