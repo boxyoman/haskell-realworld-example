@@ -6,6 +6,7 @@ in
       pkgs.haskell-language-server
       pkgs.haskellPackages.cabal-plan
       pkgs.haskellPackages.cabal-install
+      pkgs.devenv
     ];
     buildInputs = [ ];
     packages = p : [

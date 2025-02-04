@@ -6,63 +6,34 @@
 ### [Demo](https://github.com/gothinkster/realworld)&nbsp;&nbsp;&nbsp;&nbsp;[RealWorld](https://github.com/gothinkster/realworld)
 
 
-This codebase was created to demonstrate a fully fledged fullstack application built with **[Haskell/Servant/Beam]** including CRUD operations, authentication, routing, pagination, and more.
+This codebase was created to demonstrate a fully fledged fullstack application
+built with **[Haskell/Servant/Beam]** including CRUD operations, authentication,
+routing, pagination, and more.
 
-We've gone to great lengths to adhere to the **[Haskell/Servant/Beam]** community styleguides & best practices.
+We've gone to great lengths to adhere to the **[Haskell/Servant/Beam]**
+community styleguides & best practices.
 
-For more information on how to this works with other frontends/backends, head over to the [RealWorld](https://github.com/gothinkster/realworld) repo.
+For more information on how to this works with other frontends/backends, head
+over to the [RealWorld](https://github.com/gothinkster/realworld) repo.
 
 
 # Getting started
 
-## Installation
+## Running
 
-Install [Nix](https://nixos.org/nix/). If you're on a Mac follow
-[these instructions](https://medium.com/@zw3rk/provisioning-a-nixos-server-from-macos-d36055afc4ad)
-to setup NixOps, otherwise
+1. Install [Nix](https://nixos.org/nix/).
 
-    nix-env -i nixops
+2. Run `nix-shell`
 
-You'll also need [VirtualBox](https://www.virtualbox.org). You'll need to do
-one weird config change in VirtualBox
+3. Run `devenv up` inside the nix-shell.
 
-    VBoxManage hostonlyif create
+The server should now be running on port 8080.
 
-Clone the repository and move into it
+For haskell development
+[hoogle](https://wiki.haskell.org/index.php?title=Hoogle) should be running on
+port 8081, just open a browser to
+[http://localhost:8081/](http://localhost:8081/) to use it.
 
-    git clone https://github.com/boxyoman/haskell-realworld-example.git
-
-    cd haskell-realworld-example
-
-Create and deploy the NixOps config
-
-    nixops create ./ops.nix -d realworld
-
-    nixops deploy -d realworld --force-reboot
-
-Find out what the IP Address of the virtual machine is
-
-    nixops info -d
-
-View logs of the server
-
-    nixops ssh -d realworld backend
-
-    journalctl -u api.service -f
-
-## Making changes
-
-Make your change and get into a Nix Shell to compile
-
-    nix-shell shell.nix
-
-    cabal configure
-
-    cabal build
-
-Deploying changes to the VM
-
-    nixops deploy -d realworld
 
 # How it works
 

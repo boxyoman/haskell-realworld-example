@@ -28,3 +28,6 @@ cabal.project.local
 ghcid.yaml
 .env
 .ghc.environment.*
+
+.devenv
+.devenv.flake.nix
