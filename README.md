@@ -29,9 +29,8 @@ over to the [RealWorld](https://github.com/gothinkster/realworld) repo.
 
 The server should now be running on port 8080.
 
-For haskell development
-[hoogle](https://wiki.haskell.org/index.php?title=Hoogle) should be running on
-port 8081, just open a browser to
+For haskell development [hoogle](https://wiki.haskell.org/index.php?title=Hoogle)
+should be running on port 8081, just open a browser to
 [http://localhost:8081/](http://localhost:8081/) to use it.
 
 
