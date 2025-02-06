@@ -122,9 +122,9 @@ toHandler env rio = do
 openApi :: OpenApi.OpenApi
 openApi =
   toOpenApi (Proxy @Api.Api)
-  & OpenApi.info . OpenApi.title   .~ "Conduit Ap"
+  & OpenApi.info . OpenApi.title   .~ "Conduit Api"
   & OpenApi.info . OpenApi.version   .~ "0.1"
-  & OpenApi.info . OpenApi.description   ?~ "Yay!"
+  & OpenApi.info . OpenApi.description   ?~ "Generated conduit api docs"
 
 type Api =
   Api.Api
