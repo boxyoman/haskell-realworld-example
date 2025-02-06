@@ -9,15 +9,20 @@ module Password
   , getHash
   ) where
 
-import qualified Crypto.KDF.BCrypt as BCrypt
+import Crypto.KDF.BCrypt qualified as BCrypt
 import Crypto.Random.Types (MonadRandom)
-import Data.Aeson (FromJSON(..), ToJSON(..), Value(String))
+import Data.Aeson (FromJSON (..), ToJSON (..), Value (String))
 import Data.Aeson.Types (typeMismatch)
-import Database.Beam.Backend.SQL.SQL92
-import qualified Database.Beam.Postgres as Pg
+import Data.OpenApi (
+  NamedSchema (..),
+  ToSchema (..),
+  toSchema,
+ )
 import Database.Beam (FromBackendRow)
-import Database.PostgreSQL.Simple.FromField (FromField(..))
-import Text.Show (Show(..))
+import Database.Beam.Backend.SQL.SQL92
+import Database.Beam.Postgres qualified as Pg
+import Database.PostgreSQL.Simple.FromField (FromField (..))
+import Text.Show (Show (..))
 
 -- $setup
 -- The code examples in this module require GHC's `OverloadedStrings`
@@ -70,6 +75,10 @@ instance FromJSON Password where
 instance ToJSON Password where
   toJSON _ = String "**********"
 
+instance ToSchema Password where
+  declareNamedSchema _ =
+    let textSchema = toSchema (Proxy :: Proxy Text)
+    in pure $ NamedSchema (Just "Password") textSchema
 
 -- | Password hash from the database
 newtype PasswordHash = PasswordHash { unPasswordHash :: Text }
@@ -115,6 +124,10 @@ instance FromJSON NewPassword where
 instance ToJSON NewPassword where
   toJSON _ = String "**********"
 
+instance ToSchema NewPassword where
+  declareNamedSchema _ =
+    let textSchema = toSchema (Proxy :: Proxy Text)
+    in pure $ NamedSchema (Just "NewPassword") textSchema
 
 
 -- | Token used to reset passwords

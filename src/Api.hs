@@ -16,12 +16,15 @@ module Api
     , server
     ) where
 
+import Data.Aeson (FromJSON, ToJSON)
+import Data.OpenApi (ToParamSchema, ToSchema (..))
+import Data.OpenApi qualified as OpenApi
+import Database qualified as Db
+import Password (Password, comparePassword)
 import Servant
 import Servant.Server.Experimental.Auth
-import qualified Types as T
-import qualified Database as Db
-import Data.Aeson (FromJSON, ToJSON)
-import Password (Password, comparePassword)
+import SwaggerHelpers (AuthDescription (..), OpenApiTag)
+import Types qualified as T
 
 newtype NotFound = NotFound Text
   deriving (Show)
@@ -36,13 +39,34 @@ throwNotFound _ (Just a) = pure a
 throwNotFound str Nothing = throwIO (NotFound str)
 
 type instance AuthServerData (AuthProtect "required") = Db.User
+
+instance AuthDescription "required" where
+  securityName = "required"
+  securityScheme = OpenApi.SecurityScheme type_ (Just desc)
+    where
+      type_ = OpenApi.SecuritySchemeHttp
+                (OpenApi.HttpSchemeBearer Nothing)
+      desc  = "bearer token"
+
+
 type instance AuthServerData (AuthProtect "optional") = Maybe Db.User
 
-data UserBody a = UserBody
+instance AuthDescription "optional" where
+  securityName = "optional"
+  securityScheme = OpenApi.SecurityScheme type_ (Just desc)
+    where
+      type_ = OpenApi.SecuritySchemeHttp
+                (OpenApi.HttpSchemeBearer Nothing)
+      desc  = "optional bearer token"
+
+
+newtype UserBody a = UserBody
   { user :: a
   }
   deriving (Generic)
   deriving anyclass (FromJSON, ToJSON)
+
+instance ToSchema a => ToSchema (UserBody a)
 
 
 data LoginData = LoginData
@@ -50,7 +74,7 @@ data LoginData = LoginData
   , password :: Password
   }
   deriving (Generic)
-  deriving anyclass (FromJSON)
+  deriving anyclass (FromJSON, ToSchema)
 
 
 type UsersApi =
@@ -115,11 +139,11 @@ userServer =
   :<|> updateUser
 
 
-data ProfileResult = ProfileResult
+newtype ProfileResult = ProfileResult
   { profile :: T.Profile
   }
   deriving (Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, ToSchema)
 
 type ProfileApi =
   AuthProtect "optional"
@@ -157,11 +181,13 @@ profileServer =
   :<|> unfollow
 
 
-data ArticleApi a = ArticleApi
+newtype ArticleApi a = ArticleApi
   { article :: a
   }
   deriving (Generic)
   deriving anyclass (ToJSON, FromJSON)
+
+instance ToSchema a => ToSchema (ArticleApi a)
 
 
 data ArticlesResult = ArticlesResult
@@ -169,20 +195,20 @@ data ArticlesResult = ArticlesResult
   , articlesCount :: Int
   }
   deriving (Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, ToSchema)
 
 toArticlesResult :: [T.ArticleGet] -> ArticlesResult
 toArticlesResult a = ArticlesResult a (length a)
 
 
 newtype Offset = Offset { unOffset :: Integer}
-  deriving newtype (FromHttpApiData)
+  deriving newtype (FromHttpApiData, ToParamSchema)
 newtype Limit = Limit { unLimit :: Integer}
-  deriving newtype (FromHttpApiData)
+  deriving newtype (FromHttpApiData, ToParamSchema)
 newtype Author = Author { unAuthor :: T.Username}
-  deriving newtype (FromHttpApiData)
+  deriving newtype (FromHttpApiData, ToParamSchema)
 newtype FavBy = FavBy { unFavBy :: T.Username}
-  deriving newtype (FromHttpApiData)
+  deriving newtype (FromHttpApiData, ToParamSchema)
 
 type ArticlesApi =
   "feed"
@@ -318,18 +344,20 @@ favoriteServer =
   favorite
   :<|> unfavorite
 
-data CommentPost a = CommentPost
+newtype CommentPost a = CommentPost
   { comment :: a
   }
   deriving (Generic)
   deriving anyclass (ToJSON, FromJSON)
 
+instance ToSchema a => ToSchema (CommentPost a)
 
-data CommentResult = CommentResult
+
+newtype CommentResult = CommentResult
   { comments :: [T.Comment]
   }
   deriving (Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, ToSchema)
 
 type CommentApi =
   AuthProtect "optional"
@@ -365,7 +393,7 @@ newComment ::
      Db.HasDbConn env
   => Db.User
   -> T.Slug
-  -> (CommentPost T.NewComment)
+  -> CommentPost T.NewComment
   -> Rio env (CommentPost T.Comment)
 newComment user slug (CommentPost nC) = do
   article <- Db.articleBySlug slug >>= throwNotFound "article not found"
@@ -398,21 +426,21 @@ commentServer =
   :<|> newComment
   :<|> deleteComment
 
-data TagsResult = TagsResult
+newtype TagsResult = TagsResult
   { tags :: Set T.Tag
   }
   deriving (Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, ToJSON, ToSchema)
 
 
 type Api = "api" :>
-  ( "users" :> UsersApi
-    :<|> "user" :> UserApi
-    :<|> "profiles" :> ProfileApi
-    :<|> "articles" :> ArticlesApi
-    :<|> "articles" :> FavoriteApi
-    :<|> "articles" :> CommentApi
-    :<|> "tags" :> Get '[JSON] TagsResult
+  ( "users" :> OpenApiTag "users" "users" :> UsersApi
+    :<|> "user" :> OpenApiTag "user" "user" :> UserApi
+    :<|> "profiles" :> OpenApiTag "profile" "profile" :> ProfileApi
+    :<|> "articles" :> OpenApiTag "articles" "articles" :> ArticlesApi
+    :<|> "articles" :> OpenApiTag "favorite" "favorite" :> FavoriteApi
+    :<|> "articles" :> OpenApiTag "comments" "comments" :> CommentApi
+    :<|> "tags" :> OpenApiTag "tags" "tags" :> Get '[JSON] TagsResult
   )
 
 server :: Db.HasDbConn env => ServerT Api (Rio env)

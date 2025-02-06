@@ -1,10 +1,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Types
-  ( -- * General Stuff
-    HKD
-    -- * User Stuff
-  , UserId(..)
+  ( -- * User Stuff
+    UserId(..)
   , Username
   , Email
   , UpdateUser(..)
@@ -40,26 +38,26 @@ module Types
   ) where
 
 import Servant (FromHttpApiData)
-import Control.Monad.Trans.Except (runExceptT)
 import Data.Aeson (FromJSON, ToJSON(..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import Password
 import qualified Data.Text as T
 import Database.Beam.Backend.SQL.SQL92
-import Database.Beam.Postgres.Syntax (PgExpressionSyntax)
 import qualified Database.Beam.Postgres as Pg
 import Database.Beam (FromBackendRow)
 import Database.Beam.Query (HasSqlEqualityCheck)
 import Database.PostgreSQL.Simple.FromField (FromField(..))
 import qualified Crypto.JWT as JWT
 import Data.Time (getCurrentTime, UTCTime)
+import Data.OpenApi (ToParamSchema, ToSchema)
+
 
 
 newtype UserId = UserId {unUserId :: Int64}
   deriving (Generic, Eq)
   deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON, FromJSON)
+  deriving newtype (FromField, ToJSON, FromJSON, ToParamSchema, ToSchema)
 
 instance FromBackendRow Pg.Postgres UserId
 instance HasSqlEqualityCheck Pg.Postgres UserId
@@ -69,7 +67,7 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be UserId where
 
 newtype Username = Username {unUsername :: Text}
   deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Username
 instance HasSqlEqualityCheck Pg.Postgres Username
@@ -79,7 +77,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Username where
 
 newtype Token = Token Text
   deriving (Generic, Show )
-  deriving newtype (FromJSON, ToJSON, IsString)
+  deriving newtype (FromJSON, ToParamSchema, ToSchema, ToJSON, IsString)
 
 
 mkClaims :: UserId -> IO JWT.ClaimsSet
@@ -135,7 +133,7 @@ decodeJWT bs = do
 
 newtype Email = Email {unEmail :: Text}
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField)
 
 instance FromBackendRow Pg.Postgres Email
 instance HasSqlEqualityCheck Pg.Postgres Email
@@ -143,10 +141,6 @@ instance HasSqlEqualityCheck Pg.Postgres Email
 instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Email where
   sqlValueSyntax = sqlValueSyntax . unEmail
 
-
-type family HKD (f :: Type -> Type) a where
-  HKD Identity a = a
-  HKD f a = f a
 
 
 data UpdateUser = UpdateUser
@@ -157,7 +151,7 @@ data UpdateUser = UpdateUser
   , password :: Maybe NewPassword
   }
   deriving (Generic)
-  deriving (FromJSON)
+  deriving (FromJSON, ToSchema)
 
 
 data UserGet = UserGet
@@ -170,7 +164,7 @@ data UserGet = UserGet
   , updatedAt :: UTCTime
   }
   deriving (Generic)
-  deriving anyclass (FromJSON, ToJSON)
+  deriving anyclass (FromJSON, ToSchema, ToJSON)
 
 
 data NewUser = NewUser
@@ -179,7 +173,7 @@ data NewUser = NewUser
   , password :: NewPassword
   }
   deriving (Generic)
-  deriving anyclass (FromJSON)
+  deriving anyclass (FromJSON, ToSchema)
 
 
 data Profile = Profile
@@ -189,7 +183,7 @@ data Profile = Profile
   , following :: Bool
   }
   deriving (Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, ToSchema)
 
 
 newtype ArticleId = ArticleId {unArticleId :: Int64}
@@ -206,7 +200,7 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be ArticleId where
 
 newtype Slug = Slug { unSlug :: Text }
   deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Slug
 instance HasSqlEqualityCheck Pg.Postgres Slug
@@ -217,7 +211,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Slug where
 
 newtype Title = Title { unTitle :: Text }
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField)
 
 instance FromBackendRow Pg.Postgres Title
 instance HasSqlEqualityCheck Pg.Postgres Title
@@ -231,7 +225,7 @@ mkSlug (Title str) =
 
 newtype Description = Description { unDescription :: Text }
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField)
 
 instance FromBackendRow Pg.Postgres Description
 instance HasSqlEqualityCheck Pg.Postgres Description
@@ -241,7 +235,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Description where
 
 newtype Body = Body { unBody :: Text }
   deriving (Generic, Show)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField)
 
 instance FromBackendRow Pg.Postgres Body
 instance HasSqlEqualityCheck Pg.Postgres Body
@@ -252,7 +246,7 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be Body where
 
 newtype Tag = Tag { unTag :: Text }
   deriving (Generic, Show, Ord, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField, FromHttpApiData)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres Tag
 instance HasSqlEqualityCheck Pg.Postgres Tag
@@ -266,7 +260,7 @@ data NewArticle = NewArticle
   , tagList :: Set Tag
   }
   deriving (Generic, Show)
-  deriving anyclass (FromJSON)
+  deriving anyclass (FromJSON, ToSchema)
 
 
 data ArticleGet = ArticleGet
@@ -282,7 +276,7 @@ data ArticleGet = ArticleGet
   , author :: Profile
   }
   deriving (Generic)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, ToSchema)
 
 
 
@@ -303,13 +297,13 @@ data UpdateArticle = UpdateArticle
   , body :: Maybe Body
   }
   deriving (Generic)
-  deriving anyclass (FromJSON)
+  deriving anyclass (FromJSON, ToSchema)
 
 
 newtype CommentId = CommentId {unCommentId :: Int64}
   deriving (Generic, Show)
   deriving anyclass (Wrapped)
-  deriving newtype (FromField, ToJSON, FromJSON, FromHttpApiData)
+  deriving newtype (FromField, ToJSON, FromJSON, ToSchema, ToParamSchema, FromHttpApiData)
 
 instance FromBackendRow Pg.Postgres CommentId
 instance HasSqlEqualityCheck Pg.Postgres CommentId
@@ -320,7 +314,7 @@ instance HasSqlValueSyntax be Int64 => HasSqlValueSyntax be CommentId where
 
 newtype CommentBody = CommentBody { unCommentBody :: Text }
   deriving (Generic, Show, Eq)
-  deriving newtype (FromJSON, ToJSON, FromField)
+  deriving newtype (FromJSON, ToJSON, ToSchema, ToParamSchema, FromField)
 
 instance FromBackendRow Pg.Postgres CommentBody
 instance HasSqlEqualityCheck Pg.Postgres CommentBody
@@ -329,11 +323,11 @@ instance HasSqlValueSyntax be Text => HasSqlValueSyntax be CommentBody where
   sqlValueSyntax = sqlValueSyntax . unCommentBody
 
 
-data NewComment = NewComment
+newtype NewComment = NewComment
   { body :: CommentBody
   }
   deriving (Generic, Show)
-  deriving anyclass (FromJSON)
+  deriving anyclass (FromJSON, ToSchema)
 
 data Comment = Comment
   { id :: CommentId
@@ -343,4 +337,4 @@ data Comment = Comment
   , author :: Profile
   }
   deriving (Generic, Show)
-  deriving anyclass (ToJSON)
+  deriving anyclass (ToJSON, ToSchema)

@@ -5,15 +5,18 @@ import Api qualified
 import Data.Aeson (FromJSON, ToJSON, encode)
 import Data.ByteString qualified as BS
 import Data.List qualified as List
+import Data.OpenApi qualified as OpenApi
 import Database qualified as Db
 import Network.Wai (Request (..))
 import Rio (runRio)
 import Servant
+import Servant.OpenApi (toOpenApi)
 import Servant.Server.Experimental.Auth (
   AuthHandler,
   mkAuthHandler,
  )
 import Types qualified as T
+import Servant.Swagger.UI (SwaggerSchemaUI, swaggerSchemaUIServer)
 
 data Errors = Errors
   { errors :: ErrorBody
@@ -116,18 +119,31 @@ toHandler env rio = do
       Right a -> pure a
 
 
+openApi :: OpenApi.OpenApi
+openApi =
+  toOpenApi (Proxy @Api.Api)
+  & OpenApi.info . OpenApi.title   .~ "Conduit Ap"
+  & OpenApi.info . OpenApi.version   .~ "0.1"
+  & OpenApi.info . OpenApi.description   ?~ "Yay!"
+
+type Api =
+  Api.Api
+  :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"
+
+
 server ::
      (Db.HasDbConn env, Db.HasDbPool env)
-  => env -> Server Api.Api
+  => env -> Server Api
 server env =
   hoistServerWithContext
     (Proxy @Api.Api)
     (Proxy @MyContext)
     (toHandler env)
     Api.server
+  :<|> swaggerSchemaUIServer openApi
 
 
 app ::
      (Db.HasDbConn env, Db.HasDbPool env)
   => env -> Application
-app env = serveWithContext (Proxy @Api.Api) (authContext env) (server env)
+app env = serveWithContext (Proxy @Api) (authContext env) (server env)

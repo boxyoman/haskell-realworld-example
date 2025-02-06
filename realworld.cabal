@@ -61,6 +61,7 @@ common extensions
     OverloadedRecordDot,
     ImportQualifiedPost,
     PartialTypeSignatures,
+    AllowAmbiguousTypes,
 
 library
   import: extensions, flags
@@ -72,7 +73,8 @@ library
     Password,
     Types,
     Rio,
-    Lib
+    Lib,
+    SwaggerHelpers,
   build-depends:
     base-noprelude >= 4.7 && < 5,
     aeson,
@@ -97,6 +99,9 @@ library
     vector,
     unliftio-pool,
     mtl,
+    openapi3,
+    servant-openapi3,
+    servant-swagger-ui,
   ghc-options:
     -threaded
     -Wcompat
@@ -151,7 +156,6 @@ test-suite realworld-test
     attoparsec,
     swagger2,
     data-default,
-    servant-swagger,
     quickcheck-instances
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Werror=incomplete-patterns -Wunused-packages
   default-language:    Haskell2010
